@@ -1,8 +1,13 @@
 local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 
-local _, _, _, origX, origY = TargetFrameNameBackground:GetPoint(1)
+local origX, origY
+if TargetFrameNameBackground then
+    local _, _, _, x, y = TargetFrameNameBackground:GetPoint(1)
+    origX, origY = x, y
+end
 
 function DF.Compatibility:LeatrixPlus()
+    if not TargetFrameNameBackground then return end
     -- print('DF.Compatibility:LeatrixPlus()')
     -- print('orig', origX, origY)
 

@@ -44,7 +44,7 @@ local MINOR_VERSION = 26
 local lib, oldminor = LibStub:NewLibrary(MAJOR_VERSION, MINOR_VERSION)
 if not lib then return end
 
-local interfaceVersion = tonumber(select(4, GetBuildInfo())) or 0
+local interfaceVersion = tonumber((select(4, GetBuildInfo()))) or 0
 local camelotProjectID = WOW_PROJECT_CAMELOT
 local isCamelot = (interfaceVersion >= 16000 and interfaceVersion < 17000) or
     (camelotProjectID ~= nil and WOW_PROJECT_ID == camelotProjectID)

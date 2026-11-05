@@ -1,4 +1,4 @@
-local interfaceVersion = tonumber(select(4, GetBuildInfo())) or 0
+local interfaceVersion = tonumber((select(4, GetBuildInfo()))) or 0
 local camelotProjectID = _G.WOW_PROJECT_CAMELOT
 local isCamelot = (interfaceVersion >= 16000 and interfaceVersion < 17000) or
     (camelotProjectID ~= nil and _G.WOW_PROJECT_ID == camelotProjectID)

@@ -1,5 +1,11 @@
 # DragonflightUI_Luna Changelog
 
+## DragonflightUI_Luna V1.4.4 - 5 November 2026 (WoW: Forever)
+
+- Fixed the build-number conversion in Version.API, LibQuestXP, and LibRangeCheck: GetBuildInfo returns more than four values on Forever, and extra returns were incorrectly passed as tonumber's base argument. This prevented the version API from being created.
+- Restored the localized class-list helper used by tooltip setup and guarded the legacy Leatrix target-background integration when that frame is absent.
+- Added bounded local Lua error and module-status recording under DragonflightUIDB.global.foreverDiagnostics; errors still reach WoW's existing error handler.
+
 ## DragonflightUI_Luna V1.4.3 - 5 November 2026 (WoW: Forever)
 
 - Made the bare DragonflightUI.toc a Forever manifest instead of leaving it marked for Classic clients.

@@ -4,6 +4,73 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 -- This file is loaded only by DragonflightUI_Camelot.toc.
 DF.IsForever = true
 
+if type(_G.FillLocalizedClassList) ~= 'function' then
+    _G.FillLocalizedClassList = function(destination, female)
+        local names = female and LOCALIZED_CLASS_NAMES_FEMALE or LOCALIZED_CLASS_NAMES_MALE
+        for token, name in pairs(names or {}) do destination[token] = name end
+        return destination
+    end
+end
+
+-- Keep a bounded local record of startup failures. FrameXML.log does not
+-- contain Lua callback errors; forward every error to the existing handler.
+local previousErrors = DragonflightUIDB and DragonflightUIDB.global and
+    DragonflightUIDB.global.foreverDiagnostics and DragonflightUIDB.global.foreverDiagnostics.errors
+local diagnostics = {
+    version = C_AddOns.GetAddOnMetadata('DragonflightUI', 'Version'),
+    build = {GetBuildInfo()},
+    errors = {},
+    previousErrors = previousErrors,
+    modules = {}
+}
+DF.ForeverDiagnostics = diagnostics
+
+local function SaveDiagnostics()
+    if DF.db then
+        DF.db.global.foreverDiagnostics = diagnostics
+    else
+        DragonflightUIDB = DragonflightUIDB or {}
+        DragonflightUIDB.global = DragonflightUIDB.global or {}
+        DragonflightUIDB.global.foreverDiagnostics = diagnostics
+    end
+end
+
+if type(geterrorhandler) == 'function' and type(seterrorhandler) == 'function' then
+    local originalHandler = geterrorhandler()
+    seterrorhandler(function(message)
+        local stack = type(debugstack) == 'function' and debugstack(2, 20, 20) or ''
+        if type(message) == 'string' and
+            (message:find('DragonflightUI', 1, true) or stack:find('DragonflightUI', 1, true)) then
+            if #diagnostics.errors < 10 then
+                diagnostics.errors[#diagnostics.errors + 1] = {message = message, stack = stack}
+                SaveDiagnostics()
+            end
+        end
+        return originalHandler(message)
+    end)
+end
+
+local diagnosticFrame = CreateFrame('Frame')
+diagnosticFrame:RegisterEvent('PLAYER_LOGIN')
+diagnosticFrame:RegisterEvent('PLAYER_LOGOUT')
+diagnosticFrame:SetScript('OnEvent', function(_, event)
+    if event == 'PLAYER_LOGOUT' then
+        SaveDiagnostics()
+        return
+    end
+    C_Timer.After(3, function()
+        local ace = LibStub('AceAddon-3.0')
+        for name, module in pairs(DF.modules) do
+            diagnostics.modules[name] = {
+                enabled = ace.statuses[module.name] == true,
+                requested = module.enabledState == true,
+                setupEntered = module.wasEnabled == true
+            }
+        end
+        SaveDiagnostics()
+    end)
+end)
+
 local function GetSpellInfoCompat(spell)
     if not C_Spell or type(C_Spell.GetSpellInfo) ~= 'function' then return nil end
 

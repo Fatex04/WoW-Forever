@@ -2,7 +2,7 @@ local DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
 local L = LibStub("AceLocale-3.0"):GetLocale("DragonflightUI")
 
 -- compat @TODO
-DF.InterfaceVersion = tonumber(select(4, GetBuildInfo())) or 0
+DF.InterfaceVersion = tonumber((select(4, GetBuildInfo()))) or 0
 local camelotProjectID = rawget(_G, 'WOW_PROJECT_CAMELOT')
 DF.IsForever = (DF.InterfaceVersion >= 16000 and DF.InterfaceVersion < 17000) or
                    (camelotProjectID ~= nil and WOW_PROJECT_ID == camelotProjectID)
