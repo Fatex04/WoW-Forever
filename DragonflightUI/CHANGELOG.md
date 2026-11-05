@@ -1,5 +1,11 @@
 # DragonflightUI_Luna Changelog
 
+## DragonflightUI_Luna V1.4.3 - 5 November 2026 (WoW: Forever)
+
+- Made the bare DragonflightUI.toc a Forever manifest instead of leaving it marked for Classic clients.
+- Added DragonflightUI_Forever.toc alongside the Camelot manifest; all three load the same Forever files and Interface 16001.
+- Set an explicit enabled default and a clear "Dragonflight UI Luna - WoW Forever" title for the AddOns list.
+
 ## DragonflightUI_Luna V1.4.2 - 5 November 2026 (WoW: Forever)
 
 - Routed Forever through the Era content initialization methods for action bars, unit frames, minimap, cast bars, and other DragonflightUI modules.

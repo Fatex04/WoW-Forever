@@ -19,6 +19,8 @@ World of Warcraft\_forever_\Interface\AddOns
 ```
 
 These remain separate AddOns in game; enable both at character select.
+DragonflightUI is listed as **Dragonflight UI Luna - WoW Forever**. Its bare,
+Forever, and Camelot manifests all target the Forever client in this package.
 
 ## Compatibility notes
 
