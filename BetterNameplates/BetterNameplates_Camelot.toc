@@ -1,0 +1,15 @@
+## Interface: 16001
+## Title: BetterNameplates
+## Notes: A polished extension for Blizzard's modern nameplates in WoW: Forever (Camelot).
+## Notes-deDE: Eine Erweiterung für Blizzards moderne Namensplaketten in WoW: Forever (Camelot).
+## Author: Bayram
+## Version: 1.2.0
+## SavedVariables: BetterNameplatesDB
+## X-GameFlavor: World of Warcraft: Forever (Camelot)
+## IconTexture: Interface\AddOns\BetterNameplates\assets\bnp_logo.tga
+
+Forever.lua
+Locales.lua
+Core.lua
+Options.lua
+Minimap.lua
