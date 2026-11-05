@@ -1,5 +1,10 @@
 # DragonflightUI_Luna Changelog
 
+## DragonflightUI_Luna V1.4.2 - 5 November 2026 (WoW: Forever)
+
+- Routed Forever through the Era content initialization methods for action bars, unit frames, minimap, cast bars, and other DragonflightUI modules.
+- Kept Forever marked as a modern API client so its spell, aura, settings, and other API compatibility paths remain modern.
+
 ## DragonflightUI_Luna V1.4.1 - 5 November 2026 (WoW: Forever)
 
 - Added a Camelot-specific UI XML file that reuses Blizzard's existing currency border template instead of redefining the global template.

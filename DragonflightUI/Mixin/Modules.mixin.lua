@@ -142,8 +142,12 @@ function DragonflightUIModulesMixin:EnableAddonSpecific()
     -- print('DragonflightUIModulesMixin:EnableAddonSpecific()')
     -- DevTools_Dump(Version)
 
+    -- Forever uses the Vanilla-era content layout but exposes a modern API.
+    -- Route its modules through their Era content setup while keeping
+    -- Version.IsClassic false so API-specific compatibility checks stay modern.
     local versionTable = {
-        {'IsClassic', 'Era'}, {'IsTBC', 'TBC'}, {'IsWotlk', 'Wrath'}, {'IsCata', 'Cata'}, {'IsMoP', 'Mists'}
+        {'IsForever', 'Era'}, {'IsClassic', 'Era'}, {'IsTBC', 'TBC'}, {'IsWotlk', 'Wrath'}, {'IsCata', 'Cata'},
+        {'IsMoP', 'Mists'}
     }
 
     for k, v in ipairs(versionTable) do

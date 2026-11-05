@@ -23,6 +23,8 @@ APIs, treats Forever as a modern API client while keeping the Vanilla-era layout
 branch, and leaves aura-duration handling to Blizzard's native UI.
 Its Camelot-specific UI XML also avoids redeclaring Blizzard's currency border
 template, which is already provided by Forever's modern interface.
+Forever's module startup now selects the Era content setup for action bars,
+unit frames, and the other UI modules while retaining modern API detection.
 
 ## Usage
 
