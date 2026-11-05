@@ -1,5 +1,10 @@
 # DragonflightUI_Luna Changelog
 
+## DragonflightUI_Luna V1.4.1 - 5 November 2026 (WoW: Forever)
+
+- Added a Camelot-specific UI XML file that reuses Blizzard's existing currency border template instead of redefining the global template.
+- Prevented the duplicate deferred XML node warning recorded by the Forever client during DragonflightUI loading.
+
 ## DragonflightUI_Luna V1.4.0 - 5 November 2026 (WoW: Forever)
 
 - Added a dedicated `DragonflightUI_Camelot.toc` targeting interface 16001.

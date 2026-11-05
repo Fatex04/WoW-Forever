@@ -21,6 +21,8 @@ The `DragonflightUI_Camelot.toc` flavor targets WoW: Forever interface 16001. It
 adds compatibility adapters for modern spell, aura, quest, spellbook, and settings
 APIs, treats Forever as a modern API client while keeping the Vanilla-era layout
 branch, and leaves aura-duration handling to Blizzard's native UI.
+Its Camelot-specific UI XML also avoids redeclaring Blizzard's currency border
+template, which is already provided by Forever's modern interface.
 
 ## Usage
 
