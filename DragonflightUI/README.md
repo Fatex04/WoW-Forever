@@ -4,7 +4,7 @@ DragonflightUI_Luna is an independently maintained compatibility fork of Dragonf
 
 ## What DragonflightUI_Luna changes
 
-DragonflightUI_Luna keeps the established `DragonflightUI` addon folder, saved-variable name, and internal namespaces so existing profiles and texture references continue to work. The V1.1 package includes:
+DragonflightUI_Luna keeps the established `DragonflightUI` addon folder and saved-variable name. Existing Classic profiles and texture references are retained. The original Classic implementation includes:
 
 - compatibility work for current Classic Era clients;
 - fixes for protected-frame and legacy API changes;
@@ -17,18 +17,34 @@ See [CHANGELOG.md](CHANGELOG.md) for the release history.
 
 ## WoW Forever (Camelot)
 
-The `DragonflightUI_Camelot.toc` flavor targets WoW: Forever interface 16001. It
-adds compatibility adapters for modern spell, aura, quest, spellbook, and settings
-APIs, treats Forever as a modern API client while keeping the Vanilla-era layout
-branch, and leaves aura-duration handling to Blizzard's native UI.
-Its Camelot-specific UI XML also avoids redeclaring Blizzard's currency border
-template, which is already provided by Forever's modern interface.
-Forever's module startup now selects the Era content setup for action bars,
-unit frames, and the other UI modules while retaining modern API detection.
+Version 1.5.0 uses a dedicated native Forever runtime under `Forever/`. The bare,
+`_Forever`, and `_Camelot` manifests all target interface 16001 and load this same
+runtime. The Classic FrameXML replacements and global legacy API aliases are not
+loaded by these manifests.
+
+Luna styles native action buttons, native spell flyouts, unit-frame health bars
+and text, aura borders/text, cast bars, mirror timers, and tooltip scale. Native
+clicks, paging, keybindings, buff cancellation, private auras, spell timing,
+portraits, group targeting, and value updates continue to run in Blizzard's UI.
+The theme does not read or calculate protected health, aura, or casting values.
+
+Open `/df` or `/dragonflight`, the **Dragonflight UI Luna** entry in the Game Menu,
+or the corresponding AddOns settings category. The appearance settings are saved
+under `DragonflightUIDB.forever`; the existing Classic profiles are retained.
+Layout, orientation, visibility and frame scaling use **Blizzard Edit Mode**,
+available from the Luna settings window. The Classic-only replacement aura
+headers, custom favorite flyout buttons, cast simulation, and dialog rewrites are
+not part of the Forever runtime. This is a native UI theme, not full feature
+parity with the Classic implementation.
+
+Tests load the real Forever manifest and embedded libraries in Lua 5.1 against
+strict native frame fixtures for build 1.60.1.70790. They check startup, settings,
+menu pool reuse, combat deferral, restoration and native handler preservation.
+They do not emulate the WoW taint engine or replace an in-game client check.
 
 ## Usage
 
-The addon can be configured through the in-game AddOns settings or with `/dragonflight` and `/df`. Edit Mode remains available through `/editmode`.
+The addon can be configured through the in-game AddOns settings or with `/dragonflight` and `/df`. For Forever layouts, use the Edit Mode button in Luna settings or Blizzard's Game Menu.
 
 Do not rename the installed `DragonflightUI` directory. The directory name is retained for technical compatibility and does not represent the public project name.
 

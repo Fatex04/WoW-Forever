@@ -1,5 +1,15 @@
 # DragonflightUI_Luna Changelog
 
+## DragonflightUI_Luna V1.5.0 - 5 November 2026 (WoW: Forever)
+
+- Added a dedicated Forever runtime that styles native action bars/flyouts, unit frames, auras, cast bars, mirror timers and tooltips. The Forever manifests no longer load Classic frame replacements or legacy API aliases.
+- Removed the Forever startup dependency on missing MainMenuBarLeftEndCap, SecureAuraHeaderTemplate, DoTradeSkill and MirrorTimer1 globals/templates by using the native UI systems.
+- Added a separate Luna appearance window (`/df`, `/dragonflight`, AddOns settings) and a Game Menu entry created through Blizzard's button pool. Blizzard Edit Mode manages layouts and visibility.
+- Preserved native secure action/unit click handlers, aura events, buff cancellation, private aura anchors, cast values, portrait masks and group-frame pools. Refreshes defer until combat ends.
+- Added per-component appearance toggles, font controls, reversible art/texture changes and local session diagnostics. Existing Classic profiles are retained, with new theme settings in DragonflightUIDB.forever.
+- Classic-only custom aura headers, favorite flyout buttons, cast simulation and dialog rewrites are not loaded by the native Forever runtime; it does not claim full Classic feature parity.
+- Added Lua 5.1 startup/regression tests that load the actual manifest and embedded Ace libraries against strict 1.60.1.70790 frame fixtures.
+
 ## DragonflightUI_Luna V1.4.4 - 5 November 2026 (WoW: Forever)
 
 - Fixed the build-number conversion in Version.API, LibQuestXP, and LibRangeCheck: GetBuildInfo returns more than four values on Forever, and extra returns were incorrectly passed as tonumber's base argument. This prevented the version API from being created.
