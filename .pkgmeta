@@ -1,0 +1,55 @@
+# CurseForge reads this file from the repository root.
+package-as: DragonflightUI
+enable-nolib-creation: no
+manual-changelog:
+  filename: DragonflightUI/CHANGELOG.md
+  markup-type: markdown
+move-folders:
+  DragonflightUI/DragonflightUI: DragonflightUI
+ignore:
+  # Root tooling and Classic-only source are not part of the Forever download.
+  - README.md
+  - tools
+  - DragonflightUI/API
+  - DragonflightUI/API.xml
+  - DragonflightUI/Bindings.xml
+  - DragonflightUI/Compatibility
+  - DragonflightUI/Compatibility.xml
+  - DragonflightUI/Config.lua
+  - DragonflightUI/Core.lua
+  - DragonflightUI/Embed
+  - DragonflightUI/ForeverCompatibility.lua
+  - DragonflightUI/Helper.lua
+  - DragonflightUI/LEGAL_AUDIT.md
+  - DragonflightUI/Localization
+  - DragonflightUI/LocalizationData.lua
+  - DragonflightUI/LuaFormatter.config
+  - DragonflightUI/Mixin
+  - DragonflightUI/Modules
+  - DragonflightUI/SharedMedia.lua
+  - DragonflightUI/tests
+  - DragonflightUI/Version.lua
+  - DragonflightUI/VIP.lua
+  - DragonflightUI/XML
+  # Keep only the four libraries used by the native Forever runtime.
+  - DragonflightUI/Libs/AceBucket-3.0
+  - DragonflightUI/Libs/AceComm-3.0
+  - DragonflightUI/Libs/AceConfig-3.0
+  - DragonflightUI/Libs/AceDB-3.0
+  - DragonflightUI/Libs/AceDBOptions-3.0
+  - DragonflightUI/Libs/AceEvent-3.0
+  - DragonflightUI/Libs/AceGUI-3.0
+  - DragonflightUI/Libs/AceHook-3.0
+  - DragonflightUI/Libs/AceLocale-3.0
+  - DragonflightUI/Libs/AceSerializer-3.0
+  - DragonflightUI/Libs/AceTab-3.0
+  - DragonflightUI/Libs/AceTimer-3.0
+  - DragonflightUI/Libs/LibDataBroker-1.1
+  - DragonflightUI/Libs/LibDBIcon-1.0
+  - DragonflightUI/Libs/LibDeflate
+  - DragonflightUI/Libs/LibEditModeOverride
+  - DragonflightUI/Libs/LibQuestXP
+  - DragonflightUI/Libs/LibRangeCheck-3.0
+  - DragonflightUI/Libs/LibSharedMedia-3.0
+  - DragonflightUI/Libs/LibTradeSkillRecipes
+  - DragonflightUI/Libs/TaintLess

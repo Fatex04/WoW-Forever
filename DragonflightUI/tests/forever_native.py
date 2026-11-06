@@ -48,7 +48,7 @@ class NativeRuntime(unittest.TestCase):
     def test_real_manifest_starts_with_current_build(self):
         lua = self.boot()
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.nativeRuntime'))
-        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.0')
+        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.1')
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.modules.Actionbar.setupCompleted'))
         self.assertIsNone(lua.eval('MainMenuBarLeftEndCap'))
         self.assertIsNone(lua.eval('MirrorTimer1'))

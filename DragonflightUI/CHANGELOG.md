@@ -1,5 +1,14 @@
 # DragonflightUI_Luna Changelog
 
+## Dragonflight UI Forever - Luna 1.1 - 6 November 2026
+
+- Added repository-root CurseForge packaging metadata for automatic tagged releases.
+- Automatic packages contain the standalone `DragonflightUI` folder with the
+  Forever runtime, required libraries, artwork and notices.
+- Removed dormant Classic client manifests from this Forever repository so
+  automatic game-version detection targets Forever 1.60.1 only.
+- Updated the Forever addon and runtime version to 1.1 for the `V1.1` release tag.
+
 ## Dragonflight UI Forever - Luna 1.0 - 6 November 2026
 
 - First public Forever edition, based on the validated 1.7.0 engineering build.

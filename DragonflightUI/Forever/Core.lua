@@ -3,7 +3,7 @@ local DF = LibStub('AceAddon-3.0'):NewAddon('DragonflightUI', 'AceConsole-3.0')
 ns.DF = DF
 DF.IsForever = true
 -- A running client can cache TOC metadata until its next full restart.
-DF.version = '1.0'
+DF.version = '1.1'
 DF.title = 'Dragonflight UI Forever - Luna'
 DF.API = {Version = {
     InterfaceVersion = tonumber((select(4, GetBuildInfo()))) or 0,
