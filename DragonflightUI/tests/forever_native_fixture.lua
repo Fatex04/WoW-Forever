@@ -116,7 +116,15 @@ function Frame:ClearAllPoints() geometryAllowed(self); self.points = {} end
 function Frame:GetPoint() return unpack(self.points[1] or {'CENTER', UIParent, 'CENTER', 0, 0}) end
 function Frame:SetSize(width, height) geometryAllowed(self); self.width, self.height = width, height end
 function Frame:SetWidth(width) geometryAllowed(self); self.width = width end
-function Frame:SetHeight(height) geometryAllowed(self); self.height = height end
+function Frame:SetHeight(height)
+    geometryAllowed(self)
+    local changed = self.height ~= height
+    self.height = height
+    if changed then
+        if self.scripts.OnSizeChanged then self.scripts.OnSizeChanged(self, self.width, height) end
+        for _, callback in ipairs(self.scriptHooks.OnSizeChanged or {}) do callback(self, self.width, height) end
+    end
+end
 function Frame:GetWidth() return self.width end
 function Frame:GetHeight() return self.height end
 function Frame:SetScale(scale) geometryAllowed(self); self.scale = scale end

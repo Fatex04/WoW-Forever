@@ -413,6 +413,11 @@ function DF:InstallLunaEditMode()
     -- Luna does, so no detached editor remains above a native modal dialog.
     manager:HookScript('OnShow', function() self:BeginLunaEditMode() end)
     manager:HookScript('OnHide', function() self:EndLunaEditMode() end)
+    if manager.AccountSettings then
+        -- VerticalLayoutFrame finishes its expanded/collapsed height later in
+        -- the frame; the manager's Layout callback can still see the old size.
+        manager.AccountSettings:HookScript('OnSizeChanged', function() self:LayoutLunaEditMode() end)
+    end
     hooksecurefunc(manager, 'Layout', function() self:LayoutLunaEditMode() end)
     if manager.SelectSystem then
         hooksecurefunc(manager, 'SelectSystem', function(_, systemFrame) self.editSelectedSystem = systemFrame end)

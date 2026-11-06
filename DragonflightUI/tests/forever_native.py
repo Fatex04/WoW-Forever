@@ -190,6 +190,15 @@ class NativeRuntime(unittest.TestCase):
         self.assertTrue(lua.eval('DragonflightUIEditModeFrame:IsShown()'))
         self.assertTrue(lua.eval('EditModeManagerFrame.LayoutDropdown:GetParent() == DragonflightUIEditModeFrame'))
 
+    def test_editor_resizes_after_deferred_advanced_settings_layout(self):
+        lua = self.boot()
+        lua.execute("LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'):OpenLunaEditMode()")
+        self.assertEqual(lua.eval('DragonflightUIEditModeFrame.height'), 299)
+        lua.execute('EditModeManagerFrame.AccountSettings:SetHeight(320)')
+        self.assertEqual(lua.eval('DragonflightUIEditModeFrame.height'), 574)
+        lua.execute('EditModeManagerFrame.AccountSettings:SetHeight(45)')
+        self.assertEqual(lua.eval('DragonflightUIEditModeFrame.height'), 299)
+
     def test_selected_system_opens_its_luna_appearance_page(self):
         lua = self.boot()
         lua.execute("DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:OpenLunaEditMode(); "
