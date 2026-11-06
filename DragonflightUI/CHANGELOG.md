@@ -1,5 +1,13 @@
 # DragonflightUI_Luna Changelog
 
+## DragonflightUI_Luna V1.6.0 - 6 November 2026 (WoW: Forever)
+
+- Connected the normal Esc > Edit Mode entry and `/editmode` to a Luna HUD editor. It hosts the native layout dropdown, grid, snap controls, advanced options, Save and Revert controls, retaining their original callbacks and existing layout data.
+- Added Luna settings access for the selected system, and restored the Classic Luna world dimmer. Closing, combat, unsaved warnings and temporary native modal dialogs restore the original editor controls without leaving invisible input surfaces.
+- Replaced the native action-button artwork with the bundled Dragonflight artwork instead of placing a second border inside the Classic border. Removed remaining decorative slot art and dividers; native button-art updates retain Luna's skin and restore the latest native artwork when disabled.
+- Added Dragonflight player, target, focus, pet and target-of-target frame artwork. Only decorative texture regions are resized; secure unit-frame geometry, native portrait masks, click handlers and health/power values are retained.
+- Added local editor diagnostics and regression checks for menu entry, native Save/Revert callbacks, unsaved warnings, editor restoration, modal dialogs and artwork updates.
+
 ## DragonflightUI_Luna V1.5.0 - 5 November 2026 (WoW: Forever)
 
 - Added a dedicated Forever runtime that styles native action bars/flyouts, unit frames, auras, cast bars, mirror timers and tooltips. The Forever manifests no longer load Classic frame replacements or legacy API aliases.

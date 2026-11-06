@@ -47,7 +47,7 @@ class NativeRuntime(unittest.TestCase):
     def test_real_manifest_starts_with_current_build(self):
         lua = self.boot()
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.nativeRuntime'))
-        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.5.0')
+        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.6.0')
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.modules.Actionbar.setupCompleted'))
         self.assertIsNone(lua.eval('MainMenuBarLeftEndCap'))
         self.assertIsNone(lua.eval('MirrorTimer1'))
@@ -59,7 +59,10 @@ class NativeRuntime(unittest.TestCase):
         self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContent.PlayerFrameContentMain.HealthBarsContainer.HealthBar.fill.masks[1]'), 'native-mask')
         self.assertTrue(lua.eval('PlayerFrame.PlayerFrameContainer.FrameTexture.desaturated'))
         self.assertEqual(lua.eval('MainActionBar.BorderArt.alpha'), 0)
-        self.assertTrue(lua.eval('MainActionBar.actionButtons[1].DFLunaForeverEdge.shown'))
+        self.assertTrue(lua.eval("MainActionBar.actionButtons[1].normal.texture:find('uiactionbar2x', 1, true) ~= nil"))
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].SlotArt.alpha'), 0)
+        self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContainer.FrameTexture.width'), 198)
+        self.assertEqual(lua.eval('TargetFrame.TargetFrameContainer.FrameTexture.width'), 192)
         self.assertTrue(lua.eval('BuffFrame.auraFrames[1].DFLunaForeverEdge.shown'))
         self.assertEqual(lua.eval('PlayerCastingBarFrame.fill.atlas'), 'native-atlas')
         self.assertEqual(lua.eval('PlayerCastingBarFrame.fill.writes'), 0)
@@ -69,7 +72,10 @@ class NativeRuntime(unittest.TestCase):
         lua.execute("DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF.settings.enabled = false; DF:QueueRefresh(); flushTimers()")
         self.assertEqual(lua.eval('MainActionBar.BorderArt.alpha'), 0.8)
         self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal.alpha'), 0.8)
-        self.assertFalse(lua.eval('MainActionBar.actionButtons[1].DFLunaForeverEdge.shown'))
+        self.assertIsNone(lua.eval('MainActionBar.actionButtons[1].DFLunaForeverEdge'))
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal.atlas'), 'native-atlas')
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].SlotArt.alpha'), 0.8)
+        self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContainer.FrameTexture.width'), 232)
         self.assertEqual(lua.eval('MainActionBar.actionButtons[1].TextOverlayContainer.HotKey.font[2]'), 10)
         self.assertEqual(lua.eval('PlayerCastingBarFrame.fill.atlas'), 'native-atlas')
         self.assertEqual(lua.eval('GameTooltip.scale'), 0.9)
@@ -96,7 +102,7 @@ class NativeRuntime(unittest.TestCase):
         self.assertEqual(lua.eval('SpellFlyout:Toggle()'), 'native-flyout')
         lua.execute('flushTimers()')
         self.assertEqual(lua.eval('SpellFlyout.nativeToggles'), 1)
-        self.assertTrue(lua.eval('SpellFlyout.children[2].DFLunaForeverEdge.shown'))
+        self.assertTrue(lua.eval("SpellFlyout.children[2].normal.texture:find('uiactionbar2x', 1, true) ~= nil"))
         self.assertEqual(lua.eval('SpellFlyout.children[2]:GetScript("OnClick")()'), 'native-click')
 
     def test_native_edit_mode_opens_without_rewriting_layouts(self):
@@ -104,8 +110,95 @@ class NativeRuntime(unittest.TestCase):
         lua.execute("DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:ToggleOptions(); DF:OpenNativeEditMode()")
         self.assertTrue(lua.eval('EditModeManagerFrame:IsShown()'))
         self.assertFalse(lua.eval('DF.options:IsShown()'))
-        lua.execute("MainActionBar.BorderArt.alpha = 1; EventRegistry:TriggerEvent('EditMode.Exit'); flushTimers()")
+        lua.execute("MainActionBar.BorderArt.alpha = 1; HideUIPanel(EditModeManagerFrame); flushTimers()")
         self.assertEqual(lua.eval('MainActionBar.BorderArt.alpha'), 0)
+
+    def test_escape_menu_edit_button_opens_luna_editor(self):
+        lua = self.boot()
+        lua.execute('GameMenuFrame:InitButtons(); GameMenuFrame.buttons[2].callback()')
+        self.assertTrue(lua.eval('DragonflightUIEditModeFrame:IsShown()'))
+        self.assertTrue(lua.eval('DragonflightUIEditModeDimmer:IsShown()'))
+        self.assertTrue(lua.eval('EditModeManagerFrame:IsEditModeActive()'))
+        self.assertEqual(lua.eval('EditModeManagerFrame.Title.alpha'), 0)
+        self.assertFalse(lua.eval('EditModeManagerFrame:IsMouseEnabled()'))
+        self.assertTrue(lua.eval('EditModeManagerFrame.LayoutDropdown:GetParent() == DragonflightUIEditModeFrame'))
+
+    def test_editor_uses_original_native_save_and_revert_controls(self):
+        lua = self.boot()
+        lua.execute("saveCallback = EditModeManagerFrame.SaveChangesButton:GetScript('OnClick'); "
+                    "revertCallback = EditModeManagerFrame.RevertAllChangesButton:GetScript('OnClick'); "
+                    "DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:OpenLunaEditMode()")
+        self.assertTrue(lua.eval("EditModeManagerFrame.SaveChangesButton:GetScript('OnClick') == saveCallback"))
+        self.assertTrue(lua.eval("EditModeManagerFrame.RevertAllChangesButton:GetScript('OnClick') == revertCallback"))
+        lua.execute("EditModeManagerFrame.unsavedChanges = true; saveCallback()")
+        self.assertEqual(lua.eval('EditModeManagerFrame.saves'), 1)
+        self.assertFalse(lua.eval('EditModeManagerFrame.unsavedChanges'))
+        lua.execute("EditModeManagerFrame.unsavedChanges = true; revertCallback()")
+        self.assertEqual(lua.eval('EditModeManagerFrame.reverts'), 1)
+
+    def test_editor_keeps_unsaved_warning_and_restores_native_controls(self):
+        lua = self.boot()
+        lua.execute("DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:OpenLunaEditMode(); "
+                    "EditModeManagerFrame.unsavedChanges = true; DF:ToggleEditMode()")
+        self.assertTrue(lua.eval('EditModeManagerFrame.warningShown'))
+        self.assertTrue(lua.eval('DragonflightUIEditModeFrame:IsShown()'))
+        lua.execute("EditModeManagerFrame.unsavedChanges = false; DF:ToggleEditMode()")
+        self.assertFalse(lua.eval('EditModeManagerFrame:IsShown()'))
+        self.assertFalse(lua.eval('DragonflightUIEditModeFrame:IsShown()'))
+        self.assertFalse(lua.eval('DragonflightUIEditModeDimmer:IsShown()'))
+        self.assertTrue(lua.eval('EditModeManagerFrame.LayoutDropdown:GetParent() == EditModeManagerFrame'))
+        self.assertEqual(lua.eval('EditModeManagerFrame.Title.alpha'), 0.8)
+        self.assertTrue(lua.eval('EditModeManagerFrame:IsMouseEnabled()'))
+        self.assertEqual(lua.eval('EditModeManagerFrame.LayoutDropdown.points[1][4]'), 5)
+
+    def test_editor_toggle_restores_native_window_without_leaving_edit_mode(self):
+        lua = self.boot()
+        lua.execute("DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:OpenLunaEditMode(); "
+                    "DF.settings.lunaEditMode = false; DF:QueueRefresh(); flushTimers()")
+        self.assertTrue(lua.eval('EditModeManagerFrame:IsShown()'))
+        self.assertTrue(lua.eval('EditModeManagerFrame:IsEditModeActive()'))
+        self.assertFalse(lua.eval('DragonflightUIEditModeFrame:IsShown()'))
+        self.assertTrue(lua.eval('EditModeManagerFrame.LayoutDropdown:GetParent() == EditModeManagerFrame'))
+
+    def test_editor_combat_cleanup_preserves_pending_layout_changes(self):
+        lua = self.boot()
+        lua.execute("DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:OpenLunaEditMode(); "
+                    "EditModeManagerFrame.unsavedChanges = true; combat = true; dispatch('PLAYER_REGEN_DISABLED')")
+        self.assertFalse(lua.eval('DragonflightUIEditModeFrame:IsShown()'))
+        self.assertFalse(lua.eval('DragonflightUIEditModeDimmer:IsShown()'))
+        self.assertTrue(lua.eval('EditModeManagerFrame.unsavedChanges'))
+        lua.execute("combat = false; dispatch('PLAYER_REGEN_ENABLED'); flushTimers()")
+        self.assertTrue(lua.eval('DragonflightUIEditModeFrame:IsShown()'))
+        self.assertTrue(lua.eval('EditModeManagerFrame.unsavedChanges'))
+
+    def test_editor_falls_back_when_native_chrome_changes(self):
+        lua = self.boot('EditModeManagerFrame.AccountSettings = nil')
+        lua.execute("LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'):OpenLunaEditMode()")
+        self.assertTrue(lua.eval('EditModeManagerFrame:IsShown()'))
+        self.assertEqual(lua.eval('EditModeManagerFrame.Title.alpha'), 0.8)
+        self.assertTrue(lua.eval('EditModeManagerFrame:IsMouseEnabled()'))
+        self.assertIsNone(lua.eval('DragonflightUIEditModeFrame'))
+
+    def test_editor_follows_native_locked_modal_visibility(self):
+        lua = self.boot()
+        lua.execute("DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:OpenLunaEditMode(); "
+                    "EditModeManagerFrame.locked = true; HideUIPanel(EditModeManagerFrame)")
+        self.assertTrue(lua.eval('EditModeManagerFrame:IsEditModeActive()'))
+        self.assertFalse(lua.eval('DragonflightUIEditModeFrame:IsShown()'))
+        self.assertTrue(lua.eval('EditModeManagerFrame.LayoutDropdown:GetParent() == EditModeManagerFrame'))
+        lua.execute("ShowUIPanel(EditModeManagerFrame); EditModeManagerFrame.locked = false")
+        self.assertTrue(lua.eval('DragonflightUIEditModeFrame:IsShown()'))
+        self.assertTrue(lua.eval('EditModeManagerFrame.LayoutDropdown:GetParent() == DragonflightUIEditModeFrame'))
+
+    def test_selected_system_opens_its_luna_appearance_page(self):
+        lua = self.boot()
+        lua.execute("DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:OpenLunaEditMode(); "
+                    "EditModeManagerFrame:SelectSystem(MainActionBar); DF:ShowSelectedAppearance()")
+        self.assertTrue(lua.eval('EditModeManagerFrame.nativeSelectedSystem == MainActionBar'))
+        self.assertTrue(lua.eval('DF.options.pages[2]:IsShown()'))
+        self.assertFalse(lua.eval('DF.options.pages[1]:IsShown()'))
+        lua.execute("EditModeManagerFrame:SelectSystem(PlayerFrame); DF:ShowSelectedAppearance()")
+        self.assertTrue(lua.eval('DF.options.pages[3]:IsShown()'))
 
     def test_menu_pool_has_one_luna_entry_after_each_reset(self):
         lua = self.boot()
@@ -174,7 +267,50 @@ class NativeRuntime(unittest.TestCase):
     def test_forbidden_frames_are_skipped(self):
         lua = self.boot('MainActionBar.actionButtons[1].forbidden = true')
         self.assertIsNone(lua.eval('MainActionBar.actionButtons[1].DFLunaForeverEdge'))
-        self.assertTrue(lua.eval('MainActionBar.actionButtons[2].DFLunaForeverEdge.shown'))
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal.texture'), 'native-texture')
+        self.assertTrue(lua.eval("MainActionBar.actionButtons[2].normal.texture:find('uiactionbar2x', 1, true) ~= nil"))
+
+    def test_native_button_art_updates_keep_luna_skin_and_restore_latest_native_art(self):
+        lua = self.boot()
+        lua.execute('combat = true; MainActionBar.actionButtons[1]:UpdateButtonArt()')
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].nativeArtUpdates'), 1)
+        self.assertTrue(lua.eval("MainActionBar.actionButtons[1].normal.texture:find('uiactionbar2x', 1, true) ~= nil"))
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal.width'), 46)
+        lua.execute("combat = false; DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); "
+                    "DF.settings.actionbarBorders = false; DF:QueueRefresh(); flushTimers()")
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal.atlas'), 'updated-native-normal')
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal.width'), 51)
+
+    def test_native_unit_art_updates_keep_luna_frames_without_secure_geometry_changes(self):
+        lua = self.boot()
+        lua.execute('combat = true; PlayerFrame_UpdateArt(); TargetFrame:CheckClassification()')
+        self.assertEqual(lua.eval('PlayerFrame.nativeArtUpdates'), 1)
+        self.assertEqual(lua.eval('TargetFrame.nativeClassifications'), 1)
+        self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContainer.FrameTexture.width'), 198)
+        self.assertEqual(lua.eval('TargetFrame.TargetFrameContainer.FrameTexture.width'), 192)
+        self.assertEqual(lua.eval('PlayerFrame:GetScript("OnClick")()'), 'native-target')
+        lua.execute("combat = false; DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); "
+                    "DF.settings.unitArt = false; DF:QueueRefresh(); flushTimers()")
+        self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContainer.FrameTexture.atlas'), 'native-updated-player')
+        self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContainer.FrameTexture.width'), 240)
+        self.assertEqual(lua.eval('TargetFrame.TargetFrameContainer.FrameTexture.atlas'), 'native-updated-classification')
+        self.assertEqual(lua.eval('TargetFrame.TargetFrameContainer.FrameTexture.width'), 238)
+
+    def test_classic_bar_dividers_are_hidden_and_restore_when_disabled(self):
+        lua = self.boot()
+        lua.execute('MainActionBar:UpdateDividers(); flushTimers()')
+        self.assertEqual(lua.eval('MainActionBar.nativeDividerUpdates'), 1)
+        self.assertEqual(lua.eval('MainActionBar.HorizontalDividersPool:EnumerateActive()().regions[1].alpha'), 0)
+        lua.execute("DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); "
+                    "DF.settings.hideBarArt = false; DF:QueueRefresh(); flushTimers()")
+        self.assertEqual(lua.eval('MainActionBar.HorizontalDividersPool:EnumerateActive()().regions[1].alpha'), 0.8)
+
+    def test_compact_native_target_art_is_not_stretched_to_full_target_size(self):
+        lua = self.boot("TargetFrame.TargetFrameContainer.FrameTexture:SetAtlas('UI-HUD-UnitFrame-Target-MinusMob-PortraitOn')")
+        self.assertEqual(lua.eval('TargetFrame.TargetFrameContainer.FrameTexture.atlas'),
+                         'UI-HUD-UnitFrame-Target-MinusMob-PortraitOn')
+        self.assertEqual(lua.eval('TargetFrame.TargetFrameContainer.FrameTexture.width'), 232)
+        self.assertEqual(lua.eval('TargetFrame.TargetFrameContent.TargetFrameContentMain.HealthBarsContainer.HealthBar.fill.atlas'), 'native-atlas')
 
     def test_missing_font_uses_a_real_fallback_before_text_updates(self):
         lua = self.boot('MainActionBar.actionButtons[1].TextOverlayContainer.HotKey.font = {}')
@@ -200,6 +336,9 @@ class NativeRuntime(unittest.TestCase):
         self.assertEqual([p.name for p in loaded if p.parent.name == 'Forever'], ['Core.lua', 'Style.lua', 'Options.lua'])
         self.assertFalse(any(p.parent.name in ('Modules', 'Mixin', 'Embed') for p in loaded))
         for asset in ('uiactionbar2x.blp', 'Art/luna-logo.tga', 'Castbar/CastingBarStandard2.blp',
+                      'Unitframe2x/ui-hud-unitframe-player-portraiton-2x.blp',
+                      'Unitframe2x/ui-hud-unitframe-target-portraiton-2x.blp',
+                      'Unitframe2x/ui-hud-unitframe-targetoftarget-portraiton-2x.blp',
                       'Unitframe/UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health.tga',
                       'Unitframe/UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health.tga'):
             self.assertTrue((ROOT / 'Textures' / asset).is_file(), asset)

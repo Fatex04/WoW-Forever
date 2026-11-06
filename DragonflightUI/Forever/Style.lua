@@ -1,7 +1,12 @@
 local _, ns = ...
 local DF = ns.DF
 local textureBase = 'Interface\\AddOns\\DragonflightUI\\Textures\\'
-local fontBases, alphaBases, textureBases, colorBases = {}, {}, {}, {}
+local fontBases, alphaBases, textureBases, colorBases, artSizes = {}, {}, {}, {}, {}
+local unitArtData = {
+    Player = {'ui-hud-unitframe-player-portraiton-2x', 198, 71, 396 / 512, 142 / 256},
+    Target = {'ui-hud-unitframe-target-portraiton-2x', 192, 67, 384 / 512, 134 / 256},
+    TargetofTarget = {'ui-hud-unitframe-targetoftarget-portraiton-2x', 120, 49, 240 / 256, 98 / 128},
+}
 
 local function Allowed(object)
     return object and (type(object) == 'table' or type(object) == 'userdata') and
@@ -50,9 +55,7 @@ local function Tint(object, apply)
     end
 end
 
-local function StatusTexture(bar, path, apply)
-    if not Allowed(bar) or not bar.GetStatusBarTexture then return end
-    local texture = bar:GetStatusBarTexture()
+local function Texture(texture, path, apply, coords)
     if not Allowed(texture) then return end
     local base = textureBases[texture]
     if not base then
@@ -63,7 +66,7 @@ local function StatusTexture(bar, path, apply)
     end
     if apply then
         texture:SetTexture(path)
-        texture:SetTexCoord(0, 1, 0, 1)
+        texture:SetTexCoord(unpack(coords or {0, 1, 0, 1}))
     else
         if base.atlas and base.atlas ~= '' then
             texture:SetAtlas(base.atlas)
@@ -72,6 +75,32 @@ local function StatusTexture(bar, path, apply)
         end
         texture:SetTexCoord(unpack(base.coords))
     end
+end
+
+local function StatusTexture(bar, path, apply)
+    if Allowed(bar) and bar.GetStatusBarTexture then Texture(bar:GetStatusBarTexture(), path, apply) end
+end
+
+-- Only resize decorative texture regions. Secure frame geometry, hit rectangles
+-- and the positions/values of the health and power bars stay native.
+local function ArtSize(texture, width, height, apply)
+    if not Allowed(texture) then return end
+    if not artSizes[texture] then
+        artSizes[texture] = {texture:GetWidth(), texture:GetHeight()}
+    end
+    local base = artSizes[texture]
+    texture:SetSize(apply and width or base[1], apply and height or base[2])
+end
+
+local function ForgetNativeArt(texture)
+    if texture then textureBases[texture], artSizes[texture] = nil, nil end
+end
+
+local function IsCompactTarget(texture)
+    if not Allowed(texture) then return false end
+    local atlas = textureBases[texture] and textureBases[texture].atlas or texture:GetAtlas()
+    if DF.IsSecretValue(atlas) then return true end
+    return type(atlas) == 'string' and atlas:find('MinusMob', 1, true) ~= nil
 end
 
 local function Edge(owner, icon, enabled, inset)
@@ -97,7 +126,8 @@ local function UnitParts(frame)
         or frame.TargetFrameContent and frame.TargetFrameContent.TargetFrameContentMain
     local content = main and (main.HealthBarsContainer or main)
     local health = frame.healthbar or frame.HealthBar or content and content.HealthBar
-    local power = frame.manabar or frame.ManaBar or main and main.ManaBar
+    local power = frame.manabar or frame.ManaBar or main and
+        (main.ManaBar or main.ManaBarArea and main.ManaBarArea.ManaBar)
     local name = frame.name or frame.Name or main and main.Name
     return health, power, name
 end
@@ -110,13 +140,32 @@ function DF:StyleActionButton(button, enabled)
     local hotkey = button.HotKey or overlay and overlay.HotKey
     local macro = button.Name
     if not macro and button.GetName and button:GetName() then macro = _G[button:GetName() .. 'Name'] end
-    Edge(button, icon, enabled and settings.actionbarBorders, 1)
     local normal = button.GetNormalTexture and button:GetNormalTexture()
-    Alpha(normal, 0, enabled and settings.actionbarBorders)
+    local pushed = button.GetPushedTexture and button:GetPushedTexture()
+    local borders = enabled and settings.actionbarBorders
+    Edge(button, icon, borders and not normal, 1)
+    Texture(normal, textureBase .. 'uiactionbar2x', borders,
+        {0.701171875, 0.880859375, 0.31689453125, 0.36083984375})
+    Texture(pushed, textureBase .. 'uiactionbar2x', borders,
+        {0.701171875, 0.880859375, 0.43017578125, 0.47412109375})
+    ArtSize(normal, 46, 45, borders)
+    ArtSize(pushed, 46, 45, borders)
+    Alpha(button.SlotArt, 0, borders)
+    Alpha(button.SlotBackground, 0, borders)
     Font(hotkey, settings.hotkeySize, enabled)
     Font(macro, settings.macroSize, enabled)
     Alpha(hotkey, 0, enabled and not settings.hotkeys)
     Alpha(macro, 0, enabled and not settings.macroNames)
+    if not button.DFLunaArtHooked and type(button.UpdateButtonArt) == 'function' then
+        button.DFLunaArtHooked = true
+        hooksecurefunc(button, 'UpdateButtonArt', function()
+            -- Blizzard may choose a different atlas when the bar art changes.
+            -- Record that native choice before applying Luna's artwork.
+            ForgetNativeArt(button:GetNormalTexture())
+            ForgetNativeArt(button.GetPushedTexture and button:GetPushedTexture())
+            self:StyleActionButton(button, self.active and self.settings.enabled and self.settings.actionbars)
+        end)
+    end
 end
 
 function DF:StyleActionBars(enabled)
@@ -137,6 +186,20 @@ function DF:StyleActionBars(enabled)
         if caps then
             Alpha(caps.LeftEndCap and caps.LeftEndCap.Texture, 0, enabled and self.settings.hideBarArt)
             Alpha(caps.RightEndCap and caps.RightEndCap.Texture, 0, enabled and self.settings.hideBarArt)
+        end
+        for _, key in ipairs({'HorizontalDividersPool', 'VerticalDividersPool'}) do
+            local pool = bar[key]
+            if pool then
+                for divider in pool:EnumerateActive() do
+                    for _, region in ipairs({divider:GetRegions()}) do
+                        Alpha(region, 0, enabled and self.settings.hideBarArt)
+                    end
+                end
+            end
+        end
+        if not self.dividersHooked and type(bar.UpdateDividers) == 'function' then
+            self.dividersHooked = true
+            hooksecurefunc(bar, 'UpdateDividers', function() self:QueueRefresh() end)
         end
     end
     -- Native spell flyouts retain their secure spell/action setup.
@@ -159,11 +222,25 @@ function DF:StyleUnitFrames(enabled)
         local frame = _G[name]
         if Allowed(frame) then
             local art = frame.PlayerFrameContainer or frame.TargetFrameContainer
-            Tint(art and art.FrameTexture, enabled and self.settings.frameTint)
+            local small = name == 'PetFrame' or name == 'TargetFrameToT' or name == 'FocusFrameToT'
+            local frameTexture = art and art.FrameTexture or frame.FrameTexture or
+                name == 'PetFrame' and PetFrameTexture
+            local compact = IsCompactTarget(frameTexture)
+            local unitArt = enabled and self.settings.unitArt and not compact
+            local kind = small and 'TargetofTarget' or name == 'PlayerFrame' and 'Player' or 'Target'
+            local data = unitArtData[kind]
+            Texture(frameTexture, textureBase .. 'Unitframe2x\\' .. data[1], unitArt, {0, data[4], 0, data[5]})
+            ArtSize(frameTexture, data[2], data[3], unitArt)
+            Tint(frameTexture, enabled and self.settings.frameTint)
+            if art and art.AlternatePowerFrameTexture then
+                Texture(art.AlternatePowerFrameTexture, textureBase .. 'Unitframe2x\\' .. data[1],
+                    unitArt, {0, data[4], 0, data[5]})
+                ArtSize(art.AlternatePowerFrameTexture, data[2], data[3], unitArt)
+                Tint(art.AlternatePowerFrameTexture, enabled and self.settings.frameTint)
+            end
             local health, power, nameText = UnitParts(frame)
-            local side = name == 'PlayerFrame' and 'Player' or 'Target'
-            StatusTexture(health, textureBase .. 'Unitframe\\UI-HUD-UnitFrame-' .. side .. '-PortraitOn-Bar-Health',
-                enabled and self.settings.unitTextures)
+            StatusTexture(health, textureBase .. 'Unitframe\\UI-HUD-UnitFrame-' .. kind .. '-PortraitOn-Bar-Health',
+                enabled and self.settings.unitTextures and not compact)
             Font(nameText, self.settings.unitFontScale, enabled, true)
             for _, bar in ipairs({health or false, power or false}) do
                 if bar then
@@ -173,6 +250,27 @@ function DF:StyleUnitFrames(enabled)
                 end
             end
         end
+        if Allowed(frame) and type(frame.CheckClassification) == 'function' and not frame.DFLunaClassificationHooked then
+            frame.DFLunaClassificationHooked = true
+            hooksecurefunc(frame, 'CheckClassification', function()
+                local container = frame.TargetFrameContainer
+                ForgetNativeArt(container and container.FrameTexture)
+                local health = UnitParts(frame)
+                if health then ForgetNativeArt(health:GetStatusBarTexture()) end
+                self:StyleUnitFrames(self.active and self.settings.enabled and self.settings.unitframes)
+            end)
+        end
+    end
+    if not self.playerArtHooked and type(PlayerFrame_UpdateArt) == 'function' then
+        self.playerArtHooked = true
+        hooksecurefunc('PlayerFrame_UpdateArt', function()
+            local art = PlayerFrame and PlayerFrame.PlayerFrameContainer
+            if art then
+                ForgetNativeArt(art.FrameTexture)
+                ForgetNativeArt(art.AlternatePowerFrameTexture)
+            end
+            self:StyleUnitFrames(self.active and self.settings.enabled and self.settings.unitframes)
+        end)
     end
     -- Party/Raid pools, unit selection, heal predictions, portrait masks, and
     -- health/power calculations stay exclusively under Blizzard's control.
@@ -234,6 +332,7 @@ function DF:ApplyTheme()
     self:StyleTooltip(enabled and self.settings.tooltip)
     Tint(MinimapCompassTexture, enabled and self.settings.minimap and self.settings.frameTint)
     Tint(MinimapCompassTextureUnderlay, enabled and self.settings.minimap and self.settings.frameTint)
+    self:RefreshLunaEditMode()
     for name, key in pairs({Actionbar = 'actionbars', Unitframe = 'unitframes', Buffs = 'auras', Castbar = 'castbars', Tooltip = 'tooltip', Minimap = 'minimap'}) do
         self.moduleStatus[name] = {enabled = enabled and self.settings[key] == true, setupCompleted = true, native = true}
     end

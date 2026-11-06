@@ -10,10 +10,10 @@ DF.API = {Version = {
 DragonflightUI_API = DF.API
 
 DF.defaults = {
-    enabled = true, frameTint = true, minimap = true,
+    enabled = true, frameTint = true, minimap = true, lunaEditMode = true,
     actionbars = true, actionbarBorders = true, hideBarArt = true,
     hotkeys = true, macroNames = true, hotkeySize = 12, macroSize = 11,
-    unitframes = true, unitTextures = true, unitFontScale = 1,
+    unitframes = true, unitArt = true, unitTextures = true, unitFontScale = 1,
     auras = true, auraBorders = true, auraFontSize = 11,
     castbars = true, castbarFontSize = 12,
     tooltip = true, tooltipScale = 1,
@@ -58,7 +58,11 @@ function DF:SaveDiagnostics()
     DragonflightUIDB.global = DragonflightUIDB.global or {}
     DragonflightUIDB.global.foreverDiagnostics = {
         version = self.version, build = {GetBuildInfo()}, nativeRuntime = true,
-        errors = errors, previousErrors = previousErrors, modules = self.moduleStatus or {}
+        errors = errors, previousErrors = previousErrors, modules = self.moduleStatus or {},
+        lunaEditMode = {
+            hooked = self.editModeHooked == true, enabled = self.settings and self.settings.lunaEditMode == true,
+            visible = self.editModeSession ~= nil,
+        },
     }
 end
 
@@ -83,12 +87,14 @@ function DF:OnInitialize()
     self.moduleStatus = {}
     self:RegisterChatCommand('df', 'ToggleOptions')
     self:RegisterChatCommand('dragonflight', 'ToggleOptions')
+    self:RegisterChatCommand('editmode', 'ToggleEditMode')
     self:InstallSettingsCategory()
 end
 
 function DF:OnEnable()
     self.active = true
     self:InstallGameMenuEntry()
+    self:InstallLunaEditMode()
     if EventRegistry and not self.layoutHooked then
         self.layoutHooked = true
         EventRegistry:RegisterCallback('EditMode.Exit', self.QueueRefresh, self)
@@ -100,6 +106,7 @@ end
 
 function DF:OnDisable()
     self.active = false
+    self:EndLunaEditMode()
     if not InCombatLockdown() then self:ApplyTheme() end
 end
 
@@ -118,16 +125,29 @@ function DF:QueueRefresh()
     end)
 end
 
-function DF:OpenNativeEditMode()
+function DF:OpenLunaEditMode()
     if InCombatLockdown() then
         self:Print('Edit Mode is available outside combat.')
         return
     end
     if not EditModeManagerFrame then C_AddOns.LoadAddOn('Blizzard_EditMode') end
     if EditModeManagerFrame then
+        if EditModeManagerFrame.CanEnterEditMode and not EditModeManagerFrame:CanEnterEditMode() then return end
         if self.options then self.options:Hide() end
         HideUIPanel(GameMenuFrame)
+        self:InstallLunaEditMode()
         ShowUIPanel(EditModeManagerFrame)
+    end
+end
+-- Keep the earlier entry point usable by integrations.
+DF.OpenNativeEditMode = DF.OpenLunaEditMode
+
+function DF:ToggleEditMode()
+    local manager = EditModeManagerFrame
+    if manager and manager:IsShown() then
+        manager.onCloseCallback()
+    else
+        self:OpenLunaEditMode()
     end
 end
 
@@ -172,15 +192,18 @@ for _, event in ipairs({
     'ADDON_LOADED', 'PLAYER_ENTERING_WORLD', 'PLAYER_REGEN_ENABLED',
     'UPDATE_BINDINGS', 'ACTIONBAR_PAGE_CHANGED', 'SPELLS_CHANGED', 'PLAYER_LOGOUT',
     'PLAYER_TARGET_CHANGED', 'PLAYER_FOCUS_CHANGED', 'UNIT_PET',
-    'UI_SCALE_CHANGED', 'DISPLAY_SIZE_CHANGED'
+    'UI_SCALE_CHANGED', 'DISPLAY_SIZE_CHANGED', 'PLAYER_REGEN_DISABLED'
 }) do events:RegisterEvent(event) end
 events:SetScript('OnEvent', function(_, event)
     if event == 'PLAYER_LOGOUT' then
         DF:SaveDiagnostics()
+    elseif event == 'PLAYER_REGEN_DISABLED' then
+        DF:EndLunaEditMode()
     elseif DF.active then
         if event == 'ADDON_LOADED' then
             DF:InstallGameMenuEntry()
             DF:InstallSettingsCategory()
+            DF:InstallLunaEditMode()
         end
         DF:QueueRefresh()
     end

@@ -24,11 +24,15 @@ Forever, and Camelot manifests all target the Forever client in this package.
 
 ## Compatibility notes
 
-DragonflightUI 1.5.0 uses a dedicated native runtime. Its Forever manifests do
+DragonflightUI 1.6.0 uses a dedicated native runtime. Its Forever manifests do
 not load Classic FrameXML replacements or inject legacy API globals. Action
 buttons, unit data, auras, cast bars, and mirror timers remain owned by Blizzard;
-Luna applies its artwork and text settings. Configure appearance with `/df` and
-layouts with Blizzard Edit Mode. Legacy Classic-only custom aura headers,
+Luna applies its artwork and text settings. Configure appearance with `/df`.
+**Esc > Edit Mode** and `/editmode` now open the Luna HUD editor, including the
+existing layout dropdown, grid, snap controls, advanced options, Save and Revert.
+The original native callbacks still manage layout changes and unsaved warnings.
+Select a highlighted system to adjust its layout; **Luna settings** opens the
+appearance page for that system. Legacy Classic-only custom aura headers,
 favorite flyout buttons, cast simulation and dialog rewrites are not loaded.
 The original Classic profiles are retained; native theme settings are stored
 separately. See `DragonflightUI/README.md` for the scope and validation limits.

@@ -1,6 +1,6 @@
 Run the regression checks from the `DragonflightUI` directory:
 
-Forever 1.5.0:
+Forever 1.6.0:
 
 ```text
 python -m pip install lupa
@@ -11,9 +11,13 @@ These checks load the actual Forever manifest and embedded Ace libraries in Lua
 5.1. The native-frame fixture rejects legacy templates, protected gameplay-frame
 mutations, and reads of native health/casting/aura text or values. It also checks
 the new options window in both languages and repeated Game Menu pool resets.
+The editor tests exercise the normal Game Menu callback, retained Save/Revert
+callbacks, unsaved warnings, selected-system appearance pages, combat cleanup,
+restoration and native modal visibility. Artwork tests cover native refreshes
+and restoring the latest native atlas rather than a stale initial choice.
 The fixture models source frame shapes and does not emulate WoW's taint engine.
 Client validation still requires checking native bar clicks/paging, targeting,
-buff cancellation, casts/crafting, breathing, native Edit Mode, `/df`, and new
+buff cancellation, casts/crafting, breathing, Esc > Edit Mode, `/editmode`, `/df`, and new
 session diagnostics. No native layouts or user profiles should be reset as part
 of that check.
 

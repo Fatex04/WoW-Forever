@@ -24,7 +24,7 @@ wipe = function(t) for k in pairs(t) do t[k] = nil end; return t end
 securecallfunction = function(callback, ...) return callback(...) end
 DEFAULT_CHAT_FRAME = {AddMessage = function(_, message) messages[#messages + 1] = message end}
 C_AddOns = {
-    GetAddOnMetadata = function(_, key) return key == 'Version' and '1.5.0' or nil end,
+    GetAddOnMetadata = function(_, key) return key == 'Version' and '1.6.0' or nil end,
     LoadAddOn = function() error('Unexpected load-on-demand gameplay dependency') end,
 }
 C_EditMode = {
@@ -63,6 +63,9 @@ function Region:IsForbidden() return self.forbidden == true end
 function Region:SetPoint(...) self.points[#self.points + 1] = {...} end
 function Region:ClearAllPoints() self.points = {} end
 function Region:SetSize(width, height) self.width, self.height = width, height end
+function Region:SetAllPoints(owner) self.points = {{'TOPLEFT', owner, 'TOPLEFT'}, {'BOTTOMRIGHT', owner, 'BOTTOMRIGHT'}} end
+function Region:GetWidth() return self.width end
+function Region:GetHeight() return self.height end
 function Region:SetWidth(width) self.width = width end
 function Region:SetHeight(height) self.height = height end
 function Region:GetAlpha() return self.alpha end
@@ -98,7 +101,7 @@ local function geometryAllowed(self)
 end
 local function newFrame(kind, name, parent)
     local frame = setmetatable({kind = kind, name = name, parent = parent, children = {},
-        events = {}, scripts = {}, points = {}, width = 200, height = 50,
+        events = {}, scripts = {}, scriptHooks = {}, points = {}, width = 200, height = 50,
         scale = 1, alpha = 1, shown = true}, Frame)
     if parent then parent.children[#parent.children + 1] = frame end
     frames[#frames + 1] = frame
@@ -112,6 +115,8 @@ function Frame:SetPoint(...) geometryAllowed(self); self.points[#self.points + 1
 function Frame:ClearAllPoints() geometryAllowed(self); self.points = {} end
 function Frame:GetPoint() return unpack(self.points[1] or {'CENTER', UIParent, 'CENTER', 0, 0}) end
 function Frame:SetSize(width, height) geometryAllowed(self); self.width, self.height = width, height end
+function Frame:SetWidth(width) geometryAllowed(self); self.width = width end
+function Frame:SetHeight(height) geometryAllowed(self); self.height = height end
 function Frame:GetWidth() return self.width end
 function Frame:GetHeight() return self.height end
 function Frame:SetScale(scale) geometryAllowed(self); self.scale = scale end
@@ -121,7 +126,22 @@ function Frame:SetAlpha(alpha) assert(not self.gameplay); self.alpha = alpha end
 function Frame:SetFrameStrata() geometryAllowed(self) end
 function Frame:SetToplevel() geometryAllowed(self) end
 function Frame:SetClampedToScreen() geometryAllowed(self) end
-function Frame:EnableMouse() geometryAllowed(self) end
+function Frame:EnableMouse(enabled) geometryAllowed(self); self.mouseEnabled = enabled end
+function Frame:IsMouseEnabled() return self.mouseEnabled == true end
+function Frame:SetFrameLevel(level) geometryAllowed(self); self.frameLevel = level end
+function Frame:SetAllPoints(owner) geometryAllowed(self); self.points = {{'TOPLEFT', owner, 'TOPLEFT'}, {'BOTTOMRIGHT', owner, 'BOTTOMRIGHT'}} end
+function Frame:GetNumPoints() return #self.points end
+function Frame:GetParent() return self.parent end
+function Frame:SetParent(parent)
+    geometryAllowed(self)
+    if self.parent then
+        for index, child in ipairs(self.parent.children) do
+            if child == self then table.remove(self.parent.children, index); break end
+        end
+    end
+    self.parent = parent
+    if parent then parent.children[#parent.children + 1] = self end
+end
 function Frame:SetMovable() geometryAllowed(self) end
 function Frame:RegisterForDrag() geometryAllowed(self) end
 function Frame:StartMoving() geometryAllowed(self) end
@@ -133,17 +153,30 @@ function Frame:CreateTexture() local r = region('Texture'); r.owner = self; retu
 function Frame:CreateFontString() local r = region('FontString'); r.owner = self; return r end
 function Frame:SetScript(event, callback) geometryAllowed(self); self.scripts[event] = callback end
 function Frame:GetScript(event) return self.scripts[event] end
+function Frame:HookScript(event, callback)
+    geometryAllowed(self)
+    self.scriptHooks[event] = self.scriptHooks[event] or {}
+    table.insert(self.scriptHooks[event], callback)
+end
 function Frame:RegisterEvent(event) assert(not self.gameplay); self.events[event] = true end
 function Frame:UnregisterEvent() error('Must not unregister native gameplay events') end
 function Frame:UnregisterAllEvents() error('Must not unregister native gameplay events') end
 function Frame:IsShown() return self.shown end
-function Frame:Hide() geometryAllowed(self); self.shown = false end
+function Frame:Hide()
+    geometryAllowed(self)
+    local wasShown = self.shown
+    self.shown = false
+    if wasShown and self.scripts.OnHide then self.scripts.OnHide(self) end
+    if wasShown then for _, callback in ipairs(self.scriptHooks.OnHide or {}) do callback(self) end end
+end
 function Frame:Show()
     geometryAllowed(self); self.shown = true
     if self.scripts.OnShow then self.scripts.OnShow(self) end
+    for _, callback in ipairs(self.scriptHooks.OnShow or {}) do callback(self) end
 end
 function Frame:SetShown(shown) if shown then self:Show() else self:Hide() end end
 function Frame:GetChildren() return unpack(self.children) end
+function Frame:GetRegions() return unpack(self.regions or {}) end
 function Frame:GetStatusBarTexture() return self.fill end
 function Frame:GetValue() error('Must not read concealed native bar values') end
 function Frame:GetMinMaxValues() error('Must not read concealed native bar values') end
@@ -187,22 +220,76 @@ EditModeManagerFrame = newFrame('Frame', 'EditModeManagerFrame', UIParent)
 EditModeManagerFrame:Hide()
 EventRegistry = {callbacks = {}}
 function EventRegistry:RegisterCallback(event, callback, owner)
-    self.callbacks[event] = {callback, owner}
+    self.callbacks[event] = self.callbacks[event] or {}
+    table.insert(self.callbacks[event], {callback, owner})
 end
 function EventRegistry:TriggerEvent(event)
-    local registered = self.callbacks[event]
-    if registered then registered[1](registered[2]) end
+    for _, registered in ipairs(self.callbacks[event] or {}) do registered[1](registered[2]) end
+end
+EditModeManagerFrame:EnableMouse(true)
+EditModeManagerFrame.Title = region('FontString')
+EditModeManagerFrame.LayoutLabel = region('FontString')
+for _, key in ipairs({'Border', 'Tutorial', 'CloseButton', 'LayoutDropdown', 'ShowGridCheckButton',
+    'GridSpacingSlider', 'EnableSnapCheckButton', 'EnableAdvancedOptionsCheckButton', 'AccountSettings',
+    'SaveChangesButton', 'RevertAllChangesButton'}) do
+    local control = newFrame('Frame', nil, EditModeManagerFrame)
+    control:SetPoint('TOPLEFT', EditModeManagerFrame, 'TOPLEFT', 5, -15)
+    control:EnableMouse(true)
+    EditModeManagerFrame[key] = control
+end
+EditModeManagerFrame.AccountSettings.height = 45
+function EditModeManagerFrame:CanEnterEditMode() return not combat end
+function EditModeManagerFrame:IsEditModeActive() return self.editModeActive == true end
+function EditModeManagerFrame:Layout() self.layouts = (self.layouts or 0) + 1 end
+function EditModeManagerFrame:SelectSystem(systemFrame) self.nativeSelectedSystem = systemFrame end
+function EditModeManagerFrame:EnterEditMode()
+    self.editModeActive = true
+    EventRegistry:TriggerEvent('EditMode.Enter')
+end
+EditModeManagerFrame.scripts.OnShow = function(self)
+    if not self.locked then self:EnterEditMode() end
+    self:Layout()
+end
+EditModeManagerFrame.scripts.OnHide = function(self)
+    if not self.locked then
+        self.editModeActive = false
+        EventRegistry:TriggerEvent('EditMode.Exit')
+    end
+end
+EditModeManagerFrame.onCloseCallback = function()
+    if EditModeManagerFrame.unsavedChanges then
+        EditModeManagerFrame.warningShown = true
+    else
+        HideUIPanel(EditModeManagerFrame)
+    end
+end
+EditModeManagerFrame.SaveChangesButton.scripts.OnClick = function()
+    EditModeManagerFrame.saves = (EditModeManagerFrame.saves or 0) + 1
+    EditModeManagerFrame.unsavedChanges = false
+end
+EditModeManagerFrame.RevertAllChangesButton.scripts.OnClick = function()
+    EditModeManagerFrame.reverts = (EditModeManagerFrame.reverts or 0) + 1
+    EditModeManagerFrame.unsavedChanges = false
 end
 
 local function nativeButton(name)
     local button = newFrame('CheckButton', name)
     button.icon = region('Texture'); button.icon.privateContent = true
     button.normal = region('Texture')
+    button.pushed = region('Texture')
+    button.SlotArt = region('Texture')
+    button.SlotBackground = region('Texture')
     button.TextOverlayContainer = {HotKey = region('FontString')}
     button.Name = region('FontString')
     button.secureAction = 'native-action'
     button.scripts.OnClick = function() return 'native-click' end
     button.gameplay = true
+    function button:UpdateButtonArt()
+        self.nativeArtUpdates = (self.nativeArtUpdates or 0) + 1
+        self.normal:SetAtlas('updated-native-normal')
+        self.normal:SetSize(51, 51)
+        self.pushed:SetAtlas('updated-native-pushed')
+    end
     return button
 end
 for _, name in ipairs({'MainActionBar', 'MultiBarBottomLeft', 'MultiBarBottomRight', 'MultiBarLeft',
@@ -213,6 +300,14 @@ for _, name in ipairs({'MainActionBar', 'MultiBarBottomLeft', 'MultiBarBottomRig
 end
 MainActionBar.BorderArt = region('Texture')
 MainActionBar.EndCaps = {LeftEndCap = {Texture = region('Texture')}, RightEndCap = {Texture = region('Texture')}}
+local divider = newFrame('Frame')
+divider.regions = {region('Texture'), region('Texture')}
+MainActionBar.HorizontalDividersPool = {EnumerateActive = function()
+    local yielded = false
+    return function() if not yielded then yielded = true; return divider end end
+end}
+MainActionBar.VerticalDividersPool = {EnumerateActive = function() return function() end end}
+function MainActionBar:UpdateDividers() self.nativeDividerUpdates = (self.nativeDividerUpdates or 0) + 1 end
 SpellFlyout = newFrame('Frame', 'SpellFlyout')
 SpellFlyout.children = {nativeButton('NativeFlyout1')}
 SpellFlyout.gameplay = true
@@ -239,16 +334,32 @@ for _, name in ipairs({'PlayerFrame', 'TargetFrame', 'FocusFrame', 'PetFrame', '
     main.Name.privateContent = true
     if name == 'PlayerFrame' then
         frame.PlayerFrameContainer = {FrameTexture = region('Texture')}
+        frame.PlayerFrameContainer.FrameTexture:SetSize(232, 100)
+        main.ManaBarArea = {ManaBar = main.ManaBar}
+        main.ManaBar = nil
         frame.PlayerFrameContent = {PlayerFrameContentMain = main}
     elseif name == 'TargetFrame' or name == 'FocusFrame' then
         frame.TargetFrameContainer = {FrameTexture = region('Texture')}
         frame.TargetFrameContent = {TargetFrameContentMain = main}
+        frame.TargetFrameContainer.FrameTexture:SetSize(232, 100)
+        function frame:CheckClassification()
+            self.nativeClassifications = (self.nativeClassifications or 0) + 1
+            self.TargetFrameContainer.FrameTexture:SetAtlas('native-updated-classification')
+            self.TargetFrameContainer.FrameTexture:SetSize(238, 105)
+            self.TargetFrameContent.TargetFrameContentMain.HealthBarsContainer.HealthBar.fill:SetAtlas('native-updated-health')
+        end
         frame.spellbar = statusbar()
     else
         frame.healthbar, frame.manabar, frame.name = main.HealthBarsContainer.HealthBar, main.ManaBar, main.Name
+        frame.FrameTexture = region('Texture')
     end
     frame.gameplay = true
     frame.scripts.OnClick = function() return 'native-target' end
+end
+function PlayerFrame_UpdateArt()
+    PlayerFrame.nativeArtUpdates = (PlayerFrame.nativeArtUpdates or 0) + 1
+    PlayerFrame.PlayerFrameContainer.FrameTexture:SetAtlas('native-updated-player')
+    PlayerFrame.PlayerFrameContainer.FrameTexture:SetSize(240, 110)
 end
 PlayerCastingBarFrame = statusbar('PlayerCastingBarFrame')
 PlayerCastingBarFrame.Border = region('Texture')
@@ -293,7 +404,7 @@ end
 function GameMenuFrame:InitButtons()
     self.buttons, self.buttonPool.active, self.nextLayoutIndex = {}, {}, 1
     self:AddButton('Options', function() return 'native-options' end)
-    self:AddButton('Edit Mode', function() return 'native-edit' end)
+    self:AddButton('Edit Mode', function() ShowUIPanel(EditModeManagerFrame); return 'native-edit' end)
     self:AddButton('Logout', function() return 'native-logout' end)
     if not TEST_GAMEPAD then
         self.closeButton = self:AddButton('Return to Game', function() return 'native-close' end)

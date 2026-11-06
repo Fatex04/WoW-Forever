@@ -29,9 +29,10 @@ end
 
 local pages = {
     {title = T('General', 'Allgemein'), description = T(
-        'Luna styles the native Forever interface. Move bars, frames, buffs and the minimap using Blizzard Edit Mode. Your native layouts and keybindings are preserved.',
-        'Luna gestaltet die native Forever-Oberfläche. Leisten, Rahmen, Buffs und die Minimap verschiebst du in Blizzards Bearbeitungsmodus. Native Layouts und Tastenbelegungen bleiben erhalten.'), controls = {
+        'Open Luna HUD Edit Mode from Esc > Edit Mode, /editmode or the button below. Select and move a highlighted element, then save your layout.',
+        'Öffne Lunas HUD-Bearbeitungsmodus über Esc > Edit Mode, /editmode oder den Knopf unten. Wähle einen markierten Bereich, verschiebe ihn und speichere dein Layout.'), controls = {
         {'enabled', T('Enable Luna appearance', 'Luna-Gestaltung aktivieren')},
+        {'lunaEditMode', T('Luna HUD Edit Mode', 'Luna-HUD-Bearbeitungsmodus')},
         {'frameTint', T('Silver-violet frame accents', 'Silber-violette Rahmenakzente')},
         {'minimap', T('Style the native minimap border', 'Native Minimap-Umrandung gestalten')},
     }},
@@ -50,6 +51,7 @@ local pages = {
         'Health, power, portraits, private auras and group targeting are handled by Blizzard. Party and raid layouts remain available in native Edit Mode.',
         'Gesundheit, Ressourcen, Porträts, private Auren und Gruppenauswahl verarbeitet Blizzard. Gruppen- und Schlachtzugslayouts stehen im nativen Bearbeitungsmodus bereit.'), controls = {
         {'unitframes', T('Style player, target, focus and pet frames', 'Spieler-, Ziel-, Fokus- und Begleiterrahmen gestalten')},
+        {'unitArt', T('Dragonflight frame artwork', 'Dragonflight-Rahmengestaltung')},
         {'unitTextures', T('Luna health-bar textures', 'Luna-Texturen für Gesundheitsleisten')},
         {'unitFontScale', T('Unit-frame text size', 'Schriftgröße der Einheitenrahmen'), 0.75, 1.5, 0.05},
     }},
@@ -78,6 +80,7 @@ function DF:CreateOptions()
     frame:SetPoint('CENTER')
     frame:SetScale(math.min(1, math.max(0.5, (UIParent:GetHeight() - 40) / 620)))
     frame:SetFrameStrata('DIALOG')
+    frame:SetFrameLevel(300)
     frame:SetToplevel(true)
     frame:SetClampedToScreen(true)
     frame:EnableMouse(true)
@@ -106,7 +109,7 @@ function DF:CreateOptions()
     Text(frame, 'WoW Forever  |  ' .. self.version, 90, -51, 540, 'GameFontHighlightSmall')
     local close = Button(frame, '×', 30, function() frame:Hide() end)
     close:SetPoint('TOPRIGHT', -12, -12)
-    local edit = Button(frame, T('Edit Mode', 'Bearbeitungsmodus'), 150, function() DF:OpenNativeEditMode() end)
+    local edit = Button(frame, T('Edit Mode', 'Bearbeitungsmodus'), 150, function() DF:OpenLunaEditMode() end)
     edit:SetPoint('BOTTOMLEFT', 16, 18)
     local reset = Button(frame, T('Defaults', 'Standardwerte'), 110, function()
         DragonflightUIDB.forever = DF:CopyDefaults({})
@@ -115,7 +118,7 @@ function DF:CreateOptions()
         DF:QueueRefresh()
     end)
     reset:SetPoint('BOTTOMRIGHT', -18, 18)
-    Text(frame, T('Layout and visibility: Blizzard Edit Mode.', 'Layout und Sichtbarkeit: Blizzard-Bearbeitungsmodus.'),
+    Text(frame, T('Layout and visibility: Esc > Edit Mode.', 'Layout und Sichtbarkeit: Esc > Edit Mode.'),
         184, -578, 405, 'GameFontHighlightSmall')
 
     frame.refreshers = {}
@@ -219,9 +222,200 @@ function DF:InstallSettingsCategory()
         16, -56, 570)
     local options = Button(panel, T('Open Luna settings', 'Luna-Einstellungen öffnen'), 220, function() DF:ToggleOptions() end)
     options:SetPoint('TOPLEFT', 16, -100)
-    local edit = Button(panel, T('Blizzard Edit Mode', 'Blizzard-Bearbeitungsmodus'), 220, function() DF:OpenNativeEditMode() end)
+    local edit = Button(panel, T('Luna HUD Edit Mode', 'Luna-HUD-Bearbeitungsmodus'), 220, function() DF:OpenLunaEditMode() end)
     edit:SetPoint('TOPLEFT', 16, -142)
     local category = Settings.RegisterCanvasLayoutCategory(panel, 'Dragonflight UI Luna')
     Settings.RegisterAddOnCategory(category)
     self.settingsCategory = category
+end
+
+-- Classic Luna combines an HUD editor, grid, selectable systems and per-system
+-- options. Forever already supplies the secure selection/layout controllers:
+-- retain their callbacks and data, and host their controls in the Luna window.
+local editControls = {
+    'LayoutDropdown', 'ShowGridCheckButton', 'GridSpacingSlider',
+    'EnableSnapCheckButton', 'EnableAdvancedOptionsCheckButton', 'AccountSettings',
+    'SaveChangesButton', 'RevertAllChangesButton',
+}
+
+local function RememberControl(control)
+    local saved = {parent = control:GetParent(), width = control:GetWidth(), height = control:GetHeight(), points = {}}
+    for index = 1, control:GetNumPoints() do saved.points[index] = {control:GetPoint(index)} end
+    return saved
+end
+
+local function RestoreControl(control, saved)
+    control:SetParent(saved.parent)
+    control:ClearAllPoints()
+    control:SetSize(saved.width, saved.height)
+    for _, point in ipairs(saved.points) do control:SetPoint(unpack(point)) end
+end
+
+function DF:CreateLunaEditMode()
+    if self.editModeFrame then return self.editModeFrame end
+    local frame = CreateFrame('Frame', 'DragonflightUIEditModeFrame', UIParent, 'BackdropTemplate')
+    self.editModeFrame = frame
+    frame:SetSize(510, 300)
+    frame:SetPoint('TOP', 0, -100)
+    frame:SetFrameStrata('DIALOG')
+    frame:SetFrameLevel(190)
+    frame:SetClampedToScreen(true)
+    frame:SetToplevel(true)
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag('LeftButton')
+    frame:SetScript('OnDragStart', frame.StartMoving)
+    frame:SetScript('OnDragStop', frame.StopMovingOrSizing)
+    frame:SetBackdrop({bgFile = 'Interface\\Buttons\\WHITE8X8', edgeFile = 'Interface\\Buttons\\WHITE8X8', edgeSize = 1})
+    frame:SetBackdropColor(0.035, 0.03, 0.055, 0.97)
+    frame:SetBackdropBorderColor(0.42, 0.32, 0.60, 1)
+    local logo = frame:CreateTexture(nil, 'ARTWORK')
+    logo:SetTexture('Interface\\AddOns\\DragonflightUI\\Textures\\Art\\luna-logo.tga')
+    logo:SetSize(36, 36)
+    logo:SetPoint('TOPLEFT', 16, -12)
+    Text(frame, 'HUD Edit Mode', 64, -14, 385, 'GameFontNormalLarge')
+    Text(frame, 'Dragonflight UI Luna', 64, -36, 385, 'GameFontHighlightSmall')
+    Text(frame, T('Layout', 'Layout'), 25, -56, 200, 'GameFontNormalSmall')
+    local close = Button(frame, '×', 26, function()
+        if EditModeManagerFrame then EditModeManagerFrame.onCloseCallback() end
+    end)
+    close:SetPoint('TOPRIGHT', -8, -8)
+    local appearance = Button(frame, T('Luna settings', 'Luna-Einstellungen'), 180, function() DF:ShowSelectedAppearance() end)
+    appearance:SetPoint('TOPRIGHT', -25, -69)
+    frame:SetScript('OnHide', function()
+        if DF.editModeSession and not DF.restoringEditMode and EditModeManagerFrame:IsShown() then
+            EditModeManagerFrame.onCloseCallback()
+        end
+    end)
+    frame:Hide()
+
+    -- Match Luna's Classic dimmer. It has no mouse handling.
+    local dimmer = CreateFrame('Frame', 'DragonflightUIEditModeDimmer', UIParent)
+    dimmer:SetAllPoints(UIParent)
+    dimmer:SetFrameStrata('LOW')
+    dimmer:SetFrameLevel(0)
+    dimmer:EnableMouse(false)
+    local shade = dimmer:CreateTexture(nil, 'BACKGROUND')
+    shade:SetAllPoints(dimmer)
+    shade:SetColorTexture(0, 0, 0, 0.34)
+    dimmer:Hide()
+    self.editModeDimmer = dimmer
+    return frame
+end
+
+function DF:LayoutLunaEditMode()
+    if not self.editModeSession or self.restoringEditMode or InCombatLockdown() then return end
+    local manager, frame = EditModeManagerFrame, self.editModeFrame
+    local function Place(control, point, relativePoint, x, y)
+        control:ClearAllPoints()
+        control:SetPoint(point, frame, relativePoint, x, y)
+    end
+    Place(manager.LayoutDropdown, 'TOPLEFT', 'TOPLEFT', 25, -76)
+    Place(manager.ShowGridCheckButton, 'TOPLEFT', 'TOPLEFT', 20, -116)
+    Place(manager.GridSpacingSlider, 'TOPLEFT', 'TOPLEFT', 165, -116)
+    Place(manager.EnableSnapCheckButton, 'TOPLEFT', 'TOPLEFT', 20, -151)
+    Place(manager.EnableAdvancedOptionsCheckButton, 'TOPLEFT', 'TOPLEFT', 260, -151)
+    Place(manager.AccountSettings, 'TOP', 'TOP', 0, -190)
+    Place(manager.RevertAllChangesButton, 'BOTTOMLEFT', 'BOTTOMLEFT', 25, 18)
+    Place(manager.SaveChangesButton, 'BOTTOMRIGHT', 'BOTTOMRIGHT', -25, 18)
+    frame:SetHeight(254 + manager.AccountSettings:GetHeight())
+end
+
+function DF:BeginLunaEditMode()
+    local manager = EditModeManagerFrame
+    if not self.active or not self.settings.lunaEditMode or self.editModeSession or InCombatLockdown()
+        or not manager or not manager:IsShown() then return end
+    -- If a future build changes its chrome, leave its editor intact.
+    for _, name in ipairs(editControls) do if not manager[name] then return end end
+    local frame = self:CreateLunaEditMode()
+    local session = {controls = {}, chrome = {}, mouse = manager:IsMouseEnabled()}
+    self.editModeSession = session
+    for _, name in ipairs(editControls) do
+        local control = manager[name]
+        session.controls[control] = RememberControl(control)
+        control:SetParent(frame)
+    end
+    for _, name in ipairs({'Title', 'LayoutLabel', 'Border', 'Tutorial', 'CloseButton'}) do
+        local region = manager[name]
+        if region then
+            local saved = {alpha = region:GetAlpha()}
+            if region.IsMouseEnabled then
+                saved.mouse = region:IsMouseEnabled()
+                region:EnableMouse(false)
+            end
+            session.chrome[region] = saved
+            region:SetAlpha(0)
+        end
+    end
+    -- The invisible original window must not intercept clicks.
+    manager:EnableMouse(false)
+    self:LayoutLunaEditMode()
+    self.editModeDimmer:Show()
+    frame:Show()
+end
+
+function DF:EndLunaEditMode()
+    local session = self.editModeSession
+    if not session or self.restoringEditMode then return end
+    self.restoringEditMode = true
+    for control, saved in pairs(session.controls) do RestoreControl(control, saved) end
+    for region, saved in pairs(session.chrome) do
+        region:SetAlpha(saved.alpha)
+        if saved.mouse ~= nil then region:EnableMouse(saved.mouse) end
+    end
+    if EditModeManagerFrame then EditModeManagerFrame:EnableMouse(session.mouse) end
+    self.editModeSession = nil
+    self.editModeFrame:Hide()
+    self.editModeDimmer:Hide()
+    self.restoringEditMode = false
+end
+
+function DF:RefreshLunaEditMode()
+    local manager = EditModeManagerFrame
+    if self.active and self.settings.lunaEditMode and manager and manager:IsShown()
+        and manager.IsEditModeActive and manager:IsEditModeActive() and not InCombatLockdown() then
+        self:BeginLunaEditMode()
+    else
+        self:EndLunaEditMode()
+    end
+end
+
+function DF:ShowSelectedAppearance()
+    local frame = self.editSelectedSystem
+    local name = frame and frame.GetName and frame:GetName() or ''
+    local pageIndex = 1
+    if frame and frame.actionButtons then
+        pageIndex = 2
+    elseif name:find('PlayerFrame', 1, true) or name:find('TargetFrame', 1, true)
+        or name:find('FocusFrame', 1, true) or name == 'PetFrame' then
+        pageIndex = 3
+    elseif name == 'BuffFrame' or name == 'DebuffFrame' or name:find('CastingBar', 1, true)
+        or name == 'MirrorTimerContainer' then
+        pageIndex = 4
+    elseif name == 'GameTooltip' or name == 'HudTooltip' then
+        pageIndex = 5
+    end
+    local options = self:CreateOptions()
+    for index, page in ipairs(options.pages) do page:SetShown(index == pageIndex) end
+    options:Show()
+end
+
+function DF:InstallLunaEditMode()
+    local manager = EditModeManagerFrame
+    if not manager or not manager.EnterEditMode or self.editModeHooked then return end
+    self.editModeHooked = true
+    -- The normal Esc > Edit Mode callback still opens the native controller.
+    -- Its enter event displays the Luna editor regardless of the entry point.
+    EventRegistry:RegisterCallback('EditMode.Enter', self.BeginLunaEditMode, self)
+    EventRegistry:RegisterCallback('EditMode.Exit', self.EndLunaEditMode, self)
+    -- Native layout import/new-layout dialogs temporarily hide and lock the
+    -- manager without leaving Edit Mode. Mirror that visibility as Classic
+    -- Luna does, so no detached editor remains above a native modal dialog.
+    manager:HookScript('OnShow', function() self:BeginLunaEditMode() end)
+    manager:HookScript('OnHide', function() self:EndLunaEditMode() end)
+    hooksecurefunc(manager, 'Layout', function() self:LayoutLunaEditMode() end)
+    if manager.SelectSystem then
+        hooksecurefunc(manager, 'SelectSystem', function(_, systemFrame) self.editSelectedSystem = systemFrame end)
+    end
+    self:RefreshLunaEditMode()
 end

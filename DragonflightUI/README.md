@@ -17,13 +17,14 @@ See [CHANGELOG.md](CHANGELOG.md) for the release history.
 
 ## WoW Forever (Camelot)
 
-Version 1.5.0 uses a dedicated native Forever runtime under `Forever/`. The bare,
+Version 1.6.0 uses a dedicated native Forever runtime under `Forever/`. The bare,
 `_Forever`, and `_Camelot` manifests all target interface 16001 and load this same
 runtime. The Classic FrameXML replacements and global legacy API aliases are not
 loaded by these manifests.
 
-Luna styles native action buttons, native spell flyouts, unit-frame health bars
-and text, aura borders/text, cast bars, mirror timers, and tooltip scale. Native
+Luna styles native action buttons, native spell flyouts, Dragonflight unit-frame
+artwork, health bars and text, aura borders/text, cast bars, mirror timers, and
+tooltip scale. Native
 clicks, paging, keybindings, buff cancellation, private auras, spell timing,
 portraits, group targeting, and value updates continue to run in Blizzard's UI.
 The theme does not read or calculate protected health, aura, or casting values.
@@ -31,15 +32,21 @@ The theme does not read or calculate protected health, aura, or casting values.
 Open `/df` or `/dragonflight`, the **Dragonflight UI Luna** entry in the Game Menu,
 or the corresponding AddOns settings category. The appearance settings are saved
 under `DragonflightUIDB.forever`; the existing Classic profiles are retained.
-Layout, orientation, visibility and frame scaling use **Blizzard Edit Mode**,
-available from the Luna settings window. The Classic-only replacement aura
+Open **Esc > Edit Mode**, `/editmode` or the Edit Mode button in Luna settings for
+the **Luna HUD editor**. It hosts Forever's existing layout dropdown, grid,
+snapping, advanced options, Save and Revert controls in a Luna window. Selecting
+a highlighted system keeps its native layout controls; **Luna settings** opens
+that system's appearance page. Native layout storage and unsaved-changes dialogs
+are retained, and the controls return to their original parents when the editor
+closes or Luna's editor is disabled. The Classic-only replacement aura
 headers, custom favorite flyout buttons, cast simulation, and dialog rewrites are
 not part of the Forever runtime. This is a native UI theme, not full feature
 parity with the Classic implementation.
 
 Tests load the real Forever manifest and embedded libraries in Lua 5.1 against
 strict native frame fixtures for build 1.60.1.70790. They check startup, settings,
-menu pool reuse, combat deferral, restoration and native handler preservation.
+menu pool reuse, editor entry/exit and modal dialogs, combat deferral, restoration,
+native artwork updates and native handler preservation.
 They do not emulate the WoW taint engine or replace an in-game client check.
 
 ## Usage
