@@ -3,7 +3,8 @@ local DF = LibStub('AceAddon-3.0'):NewAddon('DragonflightUI', 'AceConsole-3.0')
 ns.DF = DF
 DF.IsForever = true
 -- A running client can cache TOC metadata until its next full restart.
-DF.version = '1.7.0'
+DF.version = '1.0'
+DF.title = 'Dragonflight UI Forever - Luna'
 DF.API = {Version = {
     InterfaceVersion = tonumber((select(4, GetBuildInfo()))) or 0,
     IsForever = true, IsMainline = true, IsClassic = false
@@ -181,7 +182,7 @@ function DF:InstallGameMenuEntry()
                 button.layoutIndex = button.layoutIndex + 1
             end
         end
-        local button = menu:AddButton('Dragonflight UI Luna', function()
+        local button = menu:AddButton(DF.title, function()
             HideUIPanel(menu)
             DF:ToggleOptions()
         end)

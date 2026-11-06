@@ -1,6 +1,6 @@
 Run the regression checks from the `DragonflightUI` directory:
 
-Forever 1.6.0:
+Dragonflight UI Forever - Luna 1.0:
 
 ```text
 python -m pip install lupa
@@ -9,7 +9,9 @@ python tests/forever_native.py
 
 These checks load the actual Forever manifest and embedded Ace libraries in Lua
 5.1. The native-frame fixture rejects legacy templates, protected gameplay-frame
-mutations, and reads of native health/casting/aura text or values. It also checks
+mutations, and Lua evaluation of concealed health/casting/aura text or values.
+Opaque native widget output can pass directly to compatible rendering setters.
+It also checks
 the new options window in both languages and repeated Game Menu pool resets.
 The editor tests exercise the normal Game Menu callback, retained Save/Revert
 callbacks, unsaved warnings, selected-system appearance pages, combat cleanup,

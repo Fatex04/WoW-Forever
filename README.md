@@ -2,7 +2,7 @@
 
 This repository packages two independent AddOns for WoW: Forever (Camelot):
 
-- **DragonflightUI Luna** — a native Forever UI theme using Luna artwork and appearance controls.
+- **Dragonflight UI Forever - Luna** — a native Forever UI theme using Luna artwork and appearance controls.
 - **BNP BetterNameplates** — Forever's stock Classic plates, readable native numbers, scaling and threat support.
 
 ## Install
@@ -19,12 +19,12 @@ World of Warcraft\_forever_\Interface\AddOns
 ```
 
 These remain separate AddOns in game; enable both at character select.
-DragonflightUI is listed as **Dragonflight UI Luna - WoW Forever**. Its bare,
+DragonflightUI is listed as **Dragonflight UI Forever - Luna**. Its bare,
 Forever, and Camelot manifests all target the Forever client in this package.
 
 ## Compatibility notes
 
-DragonflightUI 1.7.0 uses the bundled Luna artwork with a complete visual layer
+Dragonflight UI Forever - Luna 1.0 uses the bundled Luna artwork with a complete visual layer
 for player, target, focus, pet and target-of-target frames. Native secure unit
 buttons and unit-data controllers remain active. Opaque health/power values and
 native text are forwarded directly to rendering widgets that accept them; they

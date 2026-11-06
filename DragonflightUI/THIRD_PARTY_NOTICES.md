@@ -1,5 +1,13 @@
 # Third-Party Notices
 
+## Forever-only package scope
+
+The Dragonflight UI Forever - Luna 1.0 ZIP includes the native `Forever/`
+runtime, LibStub, CallbackHandler, AceAddon and AceConsole, together with the
+Luna texture bundle and retained attribution/license documents. The historical
+inventory below also records components in the full Classic source tree;
+components absent from the Forever ZIP are not included or loaded by that ZIP.
+
 This distribution contains code and assets that were not created for DragonflightUI_Luna. The root MIT License applies to Dragonflight UI Classic project code and to DragonflightUI_Luna modifications only; it does not replace the licenses, permissions, or notices listed below.
 
 All existing third-party notices and license files are retained in place. This document summarizes them without modifying their terms.

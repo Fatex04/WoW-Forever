@@ -1,5 +1,15 @@
 # DragonflightUI_Luna Changelog
 
+## Dragonflight UI Forever - Luna 1.0 - 6 November 2026
+
+- First public Forever edition, based on the validated 1.7.0 engineering build.
+- Renamed the Forever AddOns listing, settings, Game Menu entry and editor branding
+  to Dragonflight UI Forever - Luna. The public Forever version starts at 1.0.
+- Kept the `DragonflightUI` folder, saved settings and native Luna Classic layout.
+- The Forever-only ZIP includes the native runtime, required embedded libraries,
+  texture assets and attribution/license notices. Classic entry points and BNP
+  are distributed separately.
+
 ## DragonflightUI_Luna V1.7.0 - 6 November 2026 (WoW: Forever)
 
 - Rebuilt player/target/focus/pet/target-of-target visuals in one Luna coordinate system, removing the overlapping Classic level circle, portrait flash and mismatched bar art. Native secure unit buttons remain active; opaque widget values/text pass directly to rendering widgets.

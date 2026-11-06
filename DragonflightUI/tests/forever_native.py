@@ -48,7 +48,7 @@ class NativeRuntime(unittest.TestCase):
     def test_real_manifest_starts_with_current_build(self):
         lua = self.boot()
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.nativeRuntime'))
-        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.7.0')
+        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.0')
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.modules.Actionbar.setupCompleted'))
         self.assertIsNone(lua.eval('MainMenuBarLeftEndCap'))
         self.assertIsNone(lua.eval('MirrorTimer1'))
@@ -219,7 +219,7 @@ class NativeRuntime(unittest.TestCase):
             self.assertEqual(lua.eval('GameMenuFrame.closeButton.layoutIndex'), 5)
             self.assertEqual(lua.eval('GameMenuFrame.buttons[1].callback()'), 'native-options')
             self.assertEqual(lua.eval('GameMenuFrame.buttons[2].callback()'), 'native-edit')
-            self.assertEqual(lua.eval('GameMenuFrame.buttons[4].text'), 'Dragonflight UI Luna')
+            self.assertEqual(lua.eval('GameMenuFrame.buttons[4].text'), 'Dragonflight UI Forever - Luna')
             self.assertEqual(lua.eval('GameMenuFrame.buttons[4].layoutIndex'), 4)
             self.assertEqual(lua.eval('GameMenuFrame.buttons[5].callback()'), 'native-close')
         lua.execute('GameMenuFrame.buttons[4].callback()')
@@ -231,7 +231,7 @@ class NativeRuntime(unittest.TestCase):
             lua.execute('GameMenuFrame:InitButtons()')
             self.assertEqual(lua.eval('#GameMenuFrame.buttons'), 4)
             self.assertIsNone(lua.eval('GameMenuFrame.closeButton'))
-            self.assertEqual(lua.eval('GameMenuFrame.buttons[4].text'), 'Dragonflight UI Luna')
+            self.assertEqual(lua.eval('GameMenuFrame.buttons[4].text'), 'Dragonflight UI Forever - Luna')
             self.assertEqual(lua.eval('GameMenuFrame.buttons[4].layoutIndex'), 4)
 
     def test_saved_diagnostics_are_read_after_the_lua_files_load(self):

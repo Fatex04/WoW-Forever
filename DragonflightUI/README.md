@@ -1,6 +1,10 @@
-# DragonflightUI_Luna
+# Dragonflight UI Forever - Luna
 
-DragonflightUI_Luna is an independently maintained compatibility fork of Dragonflight UI Classic for World of Warcraft Classic clients, with a dedicated WoW: Forever (Camelot) flavor in this package.
+Dragonflight UI Forever - Luna 1.0 is the dedicated WoW: Forever (Camelot) edition
+of the independently maintained DragonflightUI_Luna fork of Dragonflight UI Classic.
+Its public Forever version starts at 1.0; earlier Forever engineering builds used
+the 1.4–1.7 version series. The addon folder remains `DragonflightUI` so texture
+paths and saved settings continue to work.
 
 ## What DragonflightUI_Luna changes
 
@@ -17,7 +21,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the release history.
 
 ## WoW Forever (Camelot)
 
-Version 1.7.0 uses a dedicated native Forever runtime under `Forever/`. The bare,
+Version 1.0 uses a dedicated native Forever runtime under `Forever/`. The bare,
 `_Forever`, and `_Camelot` manifests all target interface 16001 and load this same
 runtime. The Classic FrameXML replacements and global legacy API aliases are not
 loaded by these manifests.
@@ -31,7 +35,7 @@ Luna forwards native health/power widget output and native labels directly to
 rendering APIs that accept opaque values. It does not evaluate or save those
 values in Lua. Aura/casting data controllers remain native.
 
-Open `/df` or `/dragonflight`, the **Dragonflight UI Luna** entry in the Game Menu,
+Open `/df` or `/dragonflight`, the **Dragonflight UI Forever - Luna** entry in the Game Menu,
 or the corresponding AddOns settings category. The appearance settings are saved
 under `DragonflightUIDB.forever`; the existing Classic profiles are retained.
 The first activation creates a separate native **Luna Classic** character
