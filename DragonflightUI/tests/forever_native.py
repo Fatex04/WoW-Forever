@@ -1,7 +1,8 @@
 """Run with Python + lupa (Lua 5.1). No WoW installation is needed.
 
 Loads the real Forever TOC, embedded Ace libraries, and the whole native runtime.
-The fixture rejects legacy templates, secure gameplay mutations and value reads.
+The fixture rejects legacy templates, secure gameplay mutations and secret-value evaluation.
+Opaque widget output may pass directly to the rendering APIs that accept it.
 It models the native frame shapes of Blizzard's build 1.60.1.70790.
 """
 from pathlib import Path
@@ -47,7 +48,7 @@ class NativeRuntime(unittest.TestCase):
     def test_real_manifest_starts_with_current_build(self):
         lua = self.boot()
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.nativeRuntime'))
-        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.6.0')
+        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.7.0')
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.modules.Actionbar.setupCompleted'))
         self.assertIsNone(lua.eval('MainMenuBarLeftEndCap'))
         self.assertIsNone(lua.eval('MirrorTimer1'))
@@ -57,12 +58,13 @@ class NativeRuntime(unittest.TestCase):
         self.assertTrue(lua.eval('BuffFrame.events.UNIT_AURA'))
         self.assertTrue(lua.eval('BuffFrame.auraFrames[1].nativeCancelBuff'))
         self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContent.PlayerFrameContentMain.HealthBarsContainer.HealthBar.fill.masks[1]'), 'native-mask')
-        self.assertTrue(lua.eval('PlayerFrame.PlayerFrameContainer.FrameTexture.desaturated'))
+        self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContainer.alpha'), 0)
+        self.assertTrue(lua.eval('DragonflightUILunaPlayerFrame.Art.desaturated'))
         self.assertEqual(lua.eval('MainActionBar.BorderArt.alpha'), 0)
         self.assertTrue(lua.eval("MainActionBar.actionButtons[1].normal.texture:find('uiactionbar2x', 1, true) ~= nil"))
         self.assertEqual(lua.eval('MainActionBar.actionButtons[1].SlotArt.alpha'), 0)
-        self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContainer.FrameTexture.width'), 198)
-        self.assertEqual(lua.eval('TargetFrame.TargetFrameContainer.FrameTexture.width'), 192)
+        self.assertEqual(lua.eval('DragonflightUILunaPlayerFrame.width'), 198)
+        self.assertEqual(lua.eval('DragonflightUILunaTargetFrame.width'), 192)
         self.assertTrue(lua.eval('BuffFrame.auraFrames[1].DFLunaForeverEdge.shown'))
         self.assertEqual(lua.eval('PlayerCastingBarFrame.fill.atlas'), 'native-atlas')
         self.assertEqual(lua.eval('PlayerCastingBarFrame.fill.writes'), 0)
@@ -295,8 +297,8 @@ class NativeRuntime(unittest.TestCase):
         lua.execute('combat = true; PlayerFrame_UpdateArt(); TargetFrame:CheckClassification()')
         self.assertEqual(lua.eval('PlayerFrame.nativeArtUpdates'), 1)
         self.assertEqual(lua.eval('TargetFrame.nativeClassifications'), 1)
-        self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContainer.FrameTexture.width'), 198)
-        self.assertEqual(lua.eval('TargetFrame.TargetFrameContainer.FrameTexture.width'), 192)
+        self.assertEqual(lua.eval('DragonflightUILunaPlayerFrame.width'), 198)
+        self.assertEqual(lua.eval('DragonflightUILunaTargetFrame.width'), 192)
         self.assertEqual(lua.eval('PlayerFrame:GetScript("OnClick")()'), 'native-target')
         lua.execute("combat = false; DF = LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); "
                     "DF.settings.unitArt = false; DF:QueueRefresh(); flushTimers()")
@@ -351,6 +353,99 @@ class NativeRuntime(unittest.TestCase):
                       'Unitframe/UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health.tga',
                       'Unitframe/UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health.tga'):
             self.assertTrue((ROOT / 'Textures' / asset).is_file(), asset)
+
+    def test_unit_widgets_forward_opaque_native_values_and_text(self):
+        lua = self.boot()
+        lua.execute("native=PlayerFrame.PlayerFrameContent.PlayerFrameContentMain.HealthBarsContainer.HealthBar; "
+                    "native.value=opaque('changed health'); native.TextString.text=opaque('changed label'); "
+                    "dispatch('UNIT_HEALTH','player')")
+        self.assertTrue(lua.eval('DragonflightUILunaPlayerFrame.Health.value == native.value'))
+        self.assertTrue(lua.eval('DragonflightUILunaPlayerFrame.Health.low == native.low'))
+        self.assertTrue(lua.eval('DragonflightUILunaPlayerFrame.Health.ValueText.text == native.TextString.text'))
+        self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContent.PlayerFrameContentMain.alpha'), 0)
+        self.assertEqual(lua.eval('#reportedErrors'), 0)
+
+    def test_native_bar_render_updates_refresh_luna_without_a_full_theme_pass(self):
+        lua = self.boot()
+        lua.execute("native=TargetFrame.TargetFrameContent.TargetFrameContentMain.HealthBarsContainer.HealthBar; "
+                    "native:SetValue(opaque('new target health'))")
+        self.assertTrue(lua.eval('DragonflightUILunaTargetFrame.Health.value == native.value'))
+        self.assertEqual(lua.eval('#queued'), 0)
+        lua.execute("LibStub('AceAddon-3.0'):GetAddon('DragonflightUI').settings.enabled=false; "
+                    "LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'):QueueRefresh(); flushTimers()")
+        self.assertEqual(lua.eval('PlayerFrame.PlayerFrameContent.PlayerFrameContentMain.alpha'), 1)
+
+    def test_portrait_panels_keep_their_icon_above_the_title_strip_and_restore(self):
+        lua = self.boot()
+        lua.execute("""
+            panel=CreateFrame('Frame','FixturePanel',UIParent)
+            panel.NineSlice=CreateFrame('Frame',nil,panel); panel.NineSlice:SetFrameLevel(500)
+            for _,key in ipairs({'TopLeftCorner','TopRightCorner','BottomLeftCorner','BottomRightCorner',
+                'TopEdge','BottomEdge','LeftEdge','RightEdge'}) do
+                panel.NineSlice[key]=panel.NineSlice:CreateTexture()
+            end
+            panel.PortraitContainer=CreateFrame('Frame',nil,panel)
+            panel.PortraitContainer:SetFrameLevel(400)
+            panel.PortraitContainer.portrait=panel.PortraitContainer:CreateTexture()
+            ShowUIPanel(panel)
+        """)
+        self.assertEqual(lua.eval('panel.PortraitContainer:GetFrameLevel()'), 501)
+        self.assertTrue(lua.eval('panel.DFLunaPortraitBorder.shown'))
+        lua.execute("LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'):StyleLunaWindow(panel,false)")
+        self.assertEqual(lua.eval('panel.PortraitContainer:GetFrameLevel()'), 400)
+        self.assertFalse(lua.eval('panel.DFLunaPortraitBorder.shown'))
+        self.assertEqual(lua.eval('panel.NineSlice.TopLeftCorner.atlas'), 'native-atlas')
+
+    def test_reference_layout_is_a_copy_and_applies_only_once(self):
+        lua = self.boot()
+        lua.execute("""
+            function CopyTable(source)
+                local copy={}; for key,value in pairs(source) do
+                    copy[key]=type(value)=='table' and CopyTable(value) or value
+                end; return copy
+            end
+            UnitGUID=function() return 'fixture-character' end
+            Enum={EditModeActionBarSetting={Orientation=0,NumRows=1,NumIcons=2,IconSize=3,IconPadding=4,
+                VisibleSetting=5,HideBarArt=6,HideBarScrolling=8,AlwaysShowButtons=9},
+                EditModeUnitFrameSetting={},EditModeMinimapSetting={},EditModeMicroMenuSetting={},EditModeBagsSetting={},
+                EditModeStatusTrackingBarSetting={},EditModeLayoutType={Character=2},
+                ActionBarOrientation={Horizontal=0},ActionBarVisibleSetting={Always=0}}
+            local system={system=1,systemIndex=1,settings={}}
+            MainActionBar.system=1; MainActionBar.systemIndex=1
+            for index=0,9 do system.settings[#system.settings+1]={setting=index,value=99} end
+            EditModeManagerFrame.layoutInfo={activeLayout=1,layouts={{layoutName='My layout',layoutType=1,systems={system}}}}
+            EditModeSettingDisplayInfoManager={displayInfoMap={[1]={[3]={ConvertValue=function(_,value) return (value-50)/10 end}}}}
+            C_CVar={SetCVar=function() end}
+            C_EditMode.SaveLayouts=function(info) savedLayouts=info; saves=(saves or 0)+1 end
+            C_EditMode.SetActiveLayout=function(index) activeLayout=index end
+            DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
+            DF:ApplyClassicReferenceLayout(); DF:ApplyClassicReferenceLayout()
+        """)
+        self.assertEqual(lua.eval('saves'), 1)
+        self.assertEqual(lua.eval('savedLayouts.layouts[1].layoutName'), 'My layout')
+        self.assertEqual(lua.eval('savedLayouts.layouts[1].systems[1].settings[1].value'), 99)
+        self.assertEqual(lua.eval('savedLayouts.layouts[2].layoutName'), 'Luna Classic')
+        self.assertEqual(lua.eval('savedLayouts.layouts[2].systems[1].settings[1].value'), 0)
+        self.assertEqual(lua.eval('savedLayouts.layouts[2].systems[1].settings[4].value'), 5)
+        self.assertEqual(lua.eval('activeLayout'), 2)
+        self.assertEqual(lua.eval("DragonflightUIDB.foreverLayouts['fixture-character'].previousLayout"), 'My layout')
+
+    def test_window_browser_uses_secure_click_actions_and_disables_missing_client_features(self):
+        lua = self.boot()
+        lua.execute("""
+            CharacterMicroButton=CreateFrame('Button','CharacterMicroButton',UIParent)
+            CharacterMicroButton.scripts.OnClick=function() error('Insecure native click') end
+            HousingMicroButton=CreateFrame('Button','HousingMicroButton',UIParent)
+            EJMicroButton=CreateFrame('Button','EJMicroButton',UIParent)
+            DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:ToggleWindowBrowser()
+        """)
+        self.assertTrue(lua.eval('DF.windowBrowser.children[2].secureButton'))
+        self.assertEqual(lua.eval("DF.windowBrowser.children[2].attributes.type"), 'click')
+        self.assertFalse(lua.eval("DF.windowBrowser.children[2].attributes.useOnKeyDown"))
+        self.assertTrue(lua.eval('DF.windowBrowser.children[2].attributes.clickbutton == CharacterMicroButton'))
+        self.assertIsNone(lua.eval("DF.windowBrowser.children[2]:GetScript('OnClick')"))
+        self.assertTrue(lua.eval('DF.windowBrowser.children[8].disabled'))
+        self.assertTrue(lua.eval('DF.windowBrowser.children[12].disabled'))
 
 
 if __name__ == '__main__':

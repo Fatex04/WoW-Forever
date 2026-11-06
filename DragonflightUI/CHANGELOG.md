@@ -1,5 +1,14 @@
 # DragonflightUI_Luna Changelog
 
+## DragonflightUI_Luna V1.7.0 - 6 November 2026 (WoW: Forever)
+
+- Rebuilt player/target/focus/pet/target-of-target visuals in one Luna coordinate system, removing the overlapping Classic level circle, portrait flash and mismatched bar art. Native secure unit buttons remain active; opaque widget values/text pass directly to rendering widgets.
+- Added the separate Luna Classic native character layout: three central action-bar rows, two side grids, unit frames, XP/reputation positions, minimap, bags and micro menu. Existing layouts are kept; `/df classic` reapplies the reference.
+- Restored Luna's minimap mask, cardinal border, calendar header, zoom artwork, bag/micro-menu sprites and matching action icon masks/highlights.
+- Extended Luna panel artwork to native and load-on-demand Forever windows, including full portrait borders. `/df windows` uses secure native click shortcuts and disables unavailable client features.
+- Added regression checks for opaque-value forwarding, native font/bar hooks, copied layouts, panel restoration and secure window shortcuts. The fixtures do not simulate WoW's taint engine.
+
+
 ## DragonflightUI_Luna V1.6.0 - 6 November 2026 (WoW: Forever)
 
 - Connected the normal Esc > Edit Mode entry and `/editmode` to a Luna HUD editor. It hosts the native layout dropdown, grid, snap controls, advanced options, Save and Revert controls, retaining their original callbacks and existing layout data.

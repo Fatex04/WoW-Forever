@@ -2,7 +2,8 @@ local addonName, ns = ...
 local DF = LibStub('AceAddon-3.0'):NewAddon('DragonflightUI', 'AceConsole-3.0')
 ns.DF = DF
 DF.IsForever = true
-DF.version = C_AddOns.GetAddOnMetadata(addonName, 'Version')
+-- A running client can cache TOC metadata until its next full restart.
+DF.version = '1.7.0'
 DF.API = {Version = {
     InterfaceVersion = tonumber((select(4, GetBuildInfo()))) or 0,
     IsForever = true, IsMainline = true, IsClassic = false
@@ -10,7 +11,7 @@ DF.API = {Version = {
 DragonflightUI_API = DF.API
 
 DF.defaults = {
-    enabled = true, frameTint = true, minimap = true, lunaEditMode = true,
+    enabled = true, frameTint = false, minimap = true, lunaEditMode = true, windows = true,
     actionbars = true, actionbarBorders = true, hideBarArt = true,
     hotkeys = true, macroNames = true, hotkeySize = 12, macroSize = 11,
     unitframes = true, unitArt = true, unitTextures = true, unitFontScale = 1,
@@ -72,7 +73,7 @@ function DF:OnInitialize()
     local diagnostics = DragonflightUIDB.global and DragonflightUIDB.global.foreverDiagnostics
     previousErrors = diagnostics and diagnostics.errors
     -- The Classic profiles remain intact. Forever's theme settings have their
-    -- own account-wide section and do not rewrite server-owned Edit Mode data.
+    -- own account-wide section. The reference layout is a separate native copy.
     if type(DragonflightUIDB.forever) ~= 'table' then DragonflightUIDB.forever = {} end
     self.settings = self:CopyDefaults(DragonflightUIDB.forever)
     local limits = {
@@ -85,10 +86,26 @@ function DF:OnInitialize()
         self.settings[key] = math.max(bounds[1], math.min(bounds[2], value))
     end
     self.moduleStatus = {}
-    self:RegisterChatCommand('df', 'ToggleOptions')
-    self:RegisterChatCommand('dragonflight', 'ToggleOptions')
+    self:RegisterChatCommand('df', 'HandleCommand')
+    self:RegisterChatCommand('dragonflight', 'HandleCommand')
     self:RegisterChatCommand('editmode', 'ToggleEditMode')
     self:InstallSettingsCategory()
+end
+
+function DF:HandleCommand(input)
+    local command = (input or ''):lower():match('^%s*(%S*)')
+    if command == 'classic' then
+        if InCombatLockdown() then self:Print('Luna Classic: outside combat only.'); return end
+        self:ApplyClassicReferenceLayout(true)
+        self:QueueRefresh()
+    elseif command == 'windows' or command == 'fenster' then
+        self:ToggleWindowBrowser()
+    elseif command == 'debug' then
+        self:Print(self.version .. ' | Luna frames, bars, minimap | windows: ' .. tostring(self.styledWindowCount or 0))
+        for _, entry in ipairs(errors) do self:Print(entry.message) end
+    else
+        self:ToggleOptions()
+    end
 end
 
 function DF:OnEnable()
@@ -187,14 +204,26 @@ function DF:InstallGameMenuEntry()
     end)
 end
 
+local visualEvents = {
+    UNIT_HEALTH=true, UNIT_MAXHEALTH=true, UNIT_POWER_UPDATE=true, UNIT_MAXPOWER=true,
+    UNIT_DISPLAYPOWER=true, UNIT_NAME_UPDATE=true, UNIT_PORTRAIT_UPDATE=true, UNIT_LEVEL=true,
+    UNIT_FLAGS=true, PLAYER_UPDATE_RESTING=true,
+}
+local portraitEvents = {UNIT_PORTRAIT_UPDATE=true, PLAYER_TARGET_CHANGED=true,
+    PLAYER_FOCUS_CHANGED=true, PLAYER_ENTERING_WORLD=true, UNIT_PET=true}
 local events = CreateFrame('Frame')
 for _, event in ipairs({
     'ADDON_LOADED', 'PLAYER_ENTERING_WORLD', 'PLAYER_REGEN_ENABLED',
     'UPDATE_BINDINGS', 'ACTIONBAR_PAGE_CHANGED', 'SPELLS_CHANGED', 'PLAYER_LOGOUT',
     'PLAYER_TARGET_CHANGED', 'PLAYER_FOCUS_CHANGED', 'UNIT_PET',
-    'UI_SCALE_CHANGED', 'DISPLAY_SIZE_CHANGED', 'PLAYER_REGEN_DISABLED'
+    'UI_SCALE_CHANGED', 'DISPLAY_SIZE_CHANGED', 'PLAYER_REGEN_DISABLED', 'EDIT_MODE_LAYOUTS_UPDATED',
+    'UNIT_HEALTH', 'UNIT_MAXHEALTH', 'UNIT_POWER_UPDATE', 'UNIT_MAXPOWER',
+    'UNIT_DISPLAYPOWER', 'UNIT_NAME_UPDATE', 'UNIT_PORTRAIT_UPDATE', 'UNIT_LEVEL', 'UNIT_FLAGS',
+    'PLAYER_UPDATE_RESTING'
 }) do events:RegisterEvent(event) end
 events:SetScript('OnEvent', function(_, event)
+    if DF.UpdateLunaUnitVisuals and DF.active then DF:UpdateLunaUnitVisuals(portraitEvents[event]) end
+    if visualEvents[event] then return end
     if event == 'PLAYER_LOGOUT' then
         DF:SaveDiagnostics()
     elseif event == 'PLAYER_REGEN_DISABLED' then

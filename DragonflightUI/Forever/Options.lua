@@ -12,8 +12,8 @@ local function Text(parent, text, x, y, width, template)
     return label
 end
 
-local function Button(parent, text, width, callback)
-    local button = CreateFrame('Button', nil, parent, 'BackdropTemplate')
+local function Button(parent, text, width, callback, secure)
+    local button = CreateFrame('Button', nil, parent, secure and 'SecureActionButtonTemplate,BackdropTemplate' or 'BackdropTemplate')
     button:SetSize(width, 30)
     button:SetBackdrop({bgFile = 'Interface\\Buttons\\WHITE8X8', edgeFile = 'Interface\\Buttons\\WHITE8X8', edgeSize = 1})
     button:SetBackdropColor(0.10, 0.09, 0.14, 1)
@@ -21,7 +21,13 @@ local function Button(parent, text, width, callback)
     button.Label = button:CreateFontString(nil, 'OVERLAY', 'GameFontHighlight')
     button.Label:SetPoint('CENTER')
     button.Label:SetText(text)
-    button:SetScript('OnClick', callback)
+    if secure then
+        -- These are panel links, so always activate on release regardless of
+        -- the user's spell/action-bar key-down preference.
+        button:SetAttribute('useOnKeyDown', false)
+    else
+        button:SetScript('OnClick', callback)
+    end
     button:SetScript('OnEnter', function(self) self:SetBackdropColor(0.20, 0.14, 0.29, 1) end)
     button:SetScript('OnLeave', function(self) self:SetBackdropColor(0.10, 0.09, 0.14, 1) end)
     return button
@@ -35,6 +41,7 @@ local pages = {
         {'lunaEditMode', T('Luna HUD Edit Mode', 'Luna-HUD-Bearbeitungsmodus')},
         {'frameTint', T('Silver-violet frame accents', 'Silber-violette Rahmenakzente')},
         {'minimap', T('Style the native minimap border', 'Native Minimap-Umrandung gestalten')},
+        {'windows', T('Luna frames for game windows', 'Luna-Rahmen für Spielfenster')},
     }},
     {title = T('Action bars', 'Aktionsleisten'), description = T(
         'Native action buttons keep their paging, shortcuts and combat behavior. Luna changes only their artwork and text.',
@@ -51,7 +58,7 @@ local pages = {
         'Health, power, portraits, private auras and group targeting are handled by Blizzard. Party and raid layouts remain available in native Edit Mode.',
         'Gesundheit, Ressourcen, Porträts, private Auren und Gruppenauswahl verarbeitet Blizzard. Gruppen- und Schlachtzugslayouts stehen im nativen Bearbeitungsmodus bereit.'), controls = {
         {'unitframes', T('Style player, target, focus and pet frames', 'Spieler-, Ziel-, Fokus- und Begleiterrahmen gestalten')},
-        {'unitArt', T('Dragonflight frame artwork', 'Dragonflight-Rahmengestaltung')},
+        {'unitArt', T('Complete Luna unit frames', 'Vollständige Luna-Einheitenrahmen')},
         {'unitTextures', T('Luna health-bar textures', 'Luna-Texturen für Gesundheitsleisten')},
         {'unitFontScale', T('Unit-frame text size', 'Schriftgröße der Einheitenrahmen'), 0.75, 1.5, 0.05},
     }},
@@ -118,7 +125,7 @@ function DF:CreateOptions()
         DF:QueueRefresh()
     end)
     reset:SetPoint('BOTTOMRIGHT', -18, 18)
-    Text(frame, T('Layout and visibility: Esc > Edit Mode.', 'Layout und Sichtbarkeit: Esc > Edit Mode.'),
+    Text(frame, T('/df classic: reference layout · /df windows: game windows', '/df classic: Referenzlayout · /df windows: Spielfenster'),
         184, -578, 405, 'GameFontHighlightSmall')
 
     frame.refreshers = {}
@@ -206,6 +213,84 @@ function DF:CreateOptions()
     table.insert(UISpecialFrames, 'DragonflightUIForeverOptions')
     frame:Hide()
     return frame
+end
+
+function DF:ToggleWindowBrowser()
+    if InCombatLockdown() then self:Print(T('Available outside combat.','Außerhalb des Kampfes verfügbar.')); return end
+    if self.windowBrowser then self.windowBrowser:SetShown(not self.windowBrowser:IsShown()); return end
+    local frame = CreateFrame('Frame', 'DragonflightUILunaWindows', UIParent, 'BackdropTemplate')
+    self.windowBrowser = frame
+    frame:SetSize(280, 660)
+    frame:SetPoint('RIGHT', UIParent, 'RIGHT', -20, 0)
+    frame:SetScale(math.min(1, (UIParent:GetHeight()-40)/660))
+    frame:SetFrameStrata('DIALOG')
+    frame:SetClampedToScreen(true)
+    frame:EnableMouse(true)
+    frame:SetMovable(true)
+    frame:RegisterForDrag('LeftButton')
+    frame:SetScript('OnDragStart', frame.StartMoving)
+    frame:SetScript('OnDragStop', frame.StopMovingOrSizing)
+    frame:SetBackdrop({bgFile='Interface\\Buttons\\WHITE8X8',edgeFile='Interface\\Buttons\\WHITE8X8',edgeSize=1})
+    frame:SetBackdropColor(0.025,0.03,0.04,0.97)
+    frame:SetBackdropBorderColor(0.35,0.4,0.48,1)
+    Text(frame, T('Game windows','Spielfenster'),16,-18,220,'GameFontNormalLarge')
+    local close = Button(frame, '×', 26, function() frame:Hide() end)
+    close:SetPoint('TOPRIGHT',-8,-8)
+    local entries = {
+        {'CharacterMicroButton',T('Character','Charakter')},
+        {'ProfessionMicroButton',T('Professions','Berufe')},
+        {'SpellbookMicroButton',T('Spellbook','Zauberbuch')},
+        {'TalentMicroButton',T('Talents','Talente')},
+        {'LegacyMicroButton',T('Legacy','Vermächtnis')},
+        {'QuestLogMicroButton',T('Quest log','Questlog')},
+        {'HousingMicroButton',T('Housing / camp','Wohnen / Lager')},
+        {'GuildMicroButton',T('Guild','Gilde')},
+        {'LFDMicroButton',T('Group finder','Gruppensuche')},
+        {'CollectionsMicroButton',T('Collections','Sammlungen')},
+        {'EJMicroButton',T('Adventure guide','Abenteuerführer')},
+        {'HelpMicroButton',T('Help','Hilfe')},
+        {'StoreMicroButton',T('Shop','Shop')},
+        {'MainMenuMicroButton',T('Game menu','Spielmenü')},
+    }
+    for index, entry in ipairs(entries) do
+        local button = Button(frame, entry[2], 248, nil, true)
+        button:RegisterForClicks('LeftButtonUp')
+        local native = _G[entry[1]]
+        local available = native and native.Click and (not native.IsEnabled or native:IsEnabled())
+        if entry[1]=='HousingMicroButton' then available=available and HousingFramesUtil and type(HousingFramesUtil.ToggleHousingDashboard)=='function' end
+        if entry[1]=='EJMicroButton' then
+            local ok, allowed = false, false
+            if type(CanShowEncounterJournal)=='function' and type(ToggleEncounterJournal)=='function' then ok,allowed=pcall(CanShowEncounterJournal) end
+            available=available and ok and allowed
+        end
+        if available then
+            -- Calling native:Click() from an addon callback taints the entire
+            -- native panel-opening chain. A secure click action executes the
+            -- original button directly from the user's hardware click.
+            button:SetAttribute('type','click')
+            button:SetAttribute('clickbutton',native)
+        else
+            button:Disable()
+            button.Label:SetTextColor(0.45,0.45,0.45)
+        end
+        button:SetPoint('TOPLEFT',16,-52-(index-1)*33)
+    end
+    local map = Button(frame,T('World map','Weltkarte'),248,nil,true)
+    map:RegisterForClicks('LeftButtonUp')
+    map:SetAttribute('type','click')
+    map:SetAttribute('clickbutton',QuestLogMicroButton)
+    map:SetPoint('TOPLEFT',16,-514)
+    local friends = Button(frame,T('Friends — press O','Freunde — Taste O'),248,function()
+        DF:Print(T('Close this window and press O for the Friends panel.','Schließe dieses Fenster und drücke O für die Freundesliste.'))
+    end)
+    friends:SetPoint('TOPLEFT',16,-547)
+    local bags = Button(frame,T('Backpack','Rucksack'),248,nil,true)
+    bags:RegisterForClicks('LeftButtonUp')
+    bags:SetAttribute('type','click')
+    bags:SetAttribute('clickbutton',MainMenuBarBackpackButton)
+    bags:SetPoint('TOPLEFT',16,-580)
+    Text(frame,T('Drag the title to move this window.','Zum Verschieben am Titel ziehen.'),16,-625,248,'GameFontHighlightSmall')
+    UISpecialFrames[#UISpecialFrames+1] = 'DragonflightUILunaWindows'
 end
 
 function DF:ToggleOptions()

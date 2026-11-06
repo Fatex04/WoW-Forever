@@ -50,6 +50,13 @@ function hooksecurefunc(object, key, callback)
     end
 end
 
+-- Opaque values may pass to native widgets; formatting/math is forbidden.
+local secretMT = {}
+for _,method in ipairs({'__tostring','__concat','__add','__sub','__mul','__div','__lt','__le'}) do
+    secretMT[method]=function() error('Evaluated a secret value in Lua') end
+end
+function opaque(label) return setmetatable({secret=true,label=label},secretMT) end
+
 local Region = {}
 Region.__index = Region
 local function region(kind)
@@ -66,6 +73,15 @@ function Region:SetSize(width, height) self.width, self.height = width, height e
 function Region:SetAllPoints(owner) self.points = {{'TOPLEFT', owner, 'TOPLEFT'}, {'BOTTOMRIGHT', owner, 'BOTTOMRIGHT'}} end
 function Region:GetWidth() return self.width end
 function Region:GetHeight() return self.height end
+function Region:GetNumPoints() return #self.points end
+function Region:GetPoint(index) return unpack(self.points[index]) end
+function Region:GetParent() return self.owner end
+function Region:SetShadowColor(...) self.shadowColor={...} end
+function Region:GetShadowColor() return unpack(self.shadowColor or {0,0,0,0}) end
+function Region:SetShadowOffset(...) self.shadowOffset={...} end
+function Region:GetShadowOffset() return unpack(self.shadowOffset or {0,0}) end
+function Region:SetTextColor(...) self.textColor={...} end
+function Region:AddMaskTexture(mask) self.masks=self.masks or {}; table.insert(self.masks,mask) end
 function Region:SetWidth(width) self.width = width end
 function Region:SetHeight(height) self.height = height end
 function Region:GetAlpha() return self.alpha end
@@ -87,9 +103,10 @@ function Region:SetFont(file, size, flags)
     self.font = {file, size, flags}; self.writes = self.writes + 1
 end
 function Region:SetText(text) assert(not self.privateContent, 'Reimplemented native unit/aura text'); self.text = text end
-function Region:GetText() assert(not self.privateContent, 'Read native unit/aura text'); return self.text end
+function Region:GetText() return self.text end
 function Region:SetJustifyH() end
 function Region:SetWordWrap() end
+function Region:SetMaxLines() end
 function Region:Hide() self.shown = false end
 function Region:Show() self.shown = true end
 function Region:SetShown(shown) self.shown = shown end
@@ -130,7 +147,7 @@ function Frame:GetHeight() return self.height end
 function Frame:SetScale(scale) geometryAllowed(self); self.scale = scale end
 function Frame:GetScale() return self.scale end
 function Frame:GetAlpha() return self.alpha end
-function Frame:SetAlpha(alpha) assert(not self.gameplay); self.alpha = alpha end
+function Frame:SetAlpha(alpha) self.alpha = alpha end
 function Frame:SetFrameStrata() geometryAllowed(self) end
 function Frame:SetToplevel() geometryAllowed(self) end
 function Frame:SetClampedToScreen() geometryAllowed(self) end
@@ -158,6 +175,7 @@ function Frame:SetBackdrop() geometryAllowed(self) end
 function Frame:SetBackdropColor() geometryAllowed(self) end
 function Frame:SetBackdropBorderColor() geometryAllowed(self) end
 function Frame:CreateTexture() local r = region('Texture'); r.owner = self; return r end
+function Frame:CreateMaskTexture() local r = region('MaskTexture'); r.owner = self; return r end
 function Frame:CreateFontString() local r = region('FontString'); r.owner = self; return r end
 function Frame:SetScript(event, callback) geometryAllowed(self); self.scripts[event] = callback end
 function Frame:GetScript(event) return self.scripts[event] end
@@ -186,9 +204,19 @@ function Frame:SetShown(shown) if shown then self:Show() else self:Hide() end en
 function Frame:GetChildren() return unpack(self.children) end
 function Frame:GetRegions() return unpack(self.regions or {}) end
 function Frame:GetStatusBarTexture() return self.fill end
-function Frame:GetValue() error('Must not read concealed native bar values') end
-function Frame:GetMinMaxValues() error('Must not read concealed native bar values') end
-function Frame:SetAttribute() error('Must not replace secure native actions') end
+function Frame:SetStatusBarTexture(path) self.fill=self.fill or region('Texture'); self.fill:SetTexture(path) end
+function Frame:GetStatusBarColor() return unpack(self.barColor or {1,1,1,1}) end
+function Frame:SetStatusBarColor(...) self.barColor={...} end
+function Frame:SetAlphaFromBoolean(value,on,off) self.alphaFromBoolean={value,on,off} end
+function Frame:GetFrameLevel() return self.frameLevel or 1 end
+function Frame:GetHighlightTexture() return self.highlight end
+function Frame:GetDisabledTexture() return self.disabled end
+function Frame:Click(button) if self.scripts.OnClick then return self.scripts.OnClick(self,button) end end
+function Frame:GetValue() return self.value end
+function Frame:GetMinMaxValues() return self.low, self.high end
+function Frame:SetAttribute(key,value) assert(not self.gameplay and self.secureButton,'Must not replace secure native actions'); self.attributes=self.attributes or {}; self.attributes[key]=value end
+function Frame:RegisterForClicks() end
+function Frame:Disable() self.disabled=true end
 function Frame:SetNormalTexture(path) self.normal = region('Texture'); self.normal:SetTexture(path) end
 function Frame:GetNormalTexture() return self.normal end
 function Frame:SetPushedTexture(path) self.pushed = region('Texture'); self.pushed:SetTexture(path) end
@@ -212,12 +240,14 @@ function Frame:SetText(text) self.text = text end
 function Frame:MarkDirty() self.dirty = true end
 
 function CreateFrame(kind, name, parent, template)
-    assert(not template or template == 'BackdropTemplate', 'Unexpected UI template: ' .. tostring(template))
+    assert(not template or template == 'BackdropTemplate' or template == 'SecureActionButtonTemplate,BackdropTemplate', 'Unexpected UI template: ' .. tostring(template))
     if template then requestedTemplates[#requestedTemplates + 1] = template end
-    return newFrame(kind, name, parent)
+    local frame=newFrame(kind,name,parent)
+    frame.secureButton=template=='SecureActionButtonTemplate,BackdropTemplate'
+    return frame
 end
 UIParent = newFrame('Frame', 'UIParent')
-UIParent.height = 1440
+UIParent.height = 1440; UIParent.width=3440
 function ShowUIPanel(frame) frame:Show() end
 function HideUIPanel(frame) if frame then frame:Hide() end end
 Settings = {
@@ -333,21 +363,31 @@ local function statusbar(name)
     bar.TextString = region('FontString'); bar.TextString.privateContent = true
     bar.LeftText = region('FontString'); bar.LeftText.privateContent = true
     bar.RightText = region('FontString'); bar.RightText.privateContent = true
+    bar.value,bar.low,bar.high = opaque('value'),opaque('minimum'),opaque('maximum')
+    bar.TextString.text=opaque('unit text')
     bar.gameplay = true
     return bar
 end
 for _, name in ipairs({'PlayerFrame', 'TargetFrame', 'FocusFrame', 'PetFrame', 'TargetFrameToT', 'FocusFrameToT'}) do
     local frame = newFrame('Button', name)
-    local main = {HealthBarsContainer = {HealthBar = statusbar()}, ManaBar = statusbar(), Name = region('FontString')}
-    main.Name.privateContent = true
+    local main = newFrame('Frame',nil,frame)
+    main.HealthBarsContainer = {HealthBar=statusbar()}; main.ManaBar=statusbar(); main.Name=region('FontString')
+    main.Name.privateContent = true; main.Name.text=opaque('name')
+    local container=newFrame('Frame',nil,frame)
+    container.HealthBar=main.HealthBarsContainer.HealthBar
+    container.HealthBar.parent=container
+    main.HealthBarsContainer=container
+    main.LevelText=region('FontString'); main.LevelText.text=opaque('level')
     if name == 'PlayerFrame' then
-        frame.PlayerFrameContainer = {FrameTexture = region('Texture')}
+        frame.PlayerFrameContainer = newFrame('Frame',nil,frame)
+        frame.PlayerFrameContainer.FrameTexture=region('Texture')
         frame.PlayerFrameContainer.FrameTexture:SetSize(232, 100)
         main.ManaBarArea = {ManaBar = main.ManaBar}
         main.ManaBar = nil
         frame.PlayerFrameContent = {PlayerFrameContentMain = main}
     elseif name == 'TargetFrame' or name == 'FocusFrame' then
-        frame.TargetFrameContainer = {FrameTexture = region('Texture')}
+        frame.TargetFrameContainer = newFrame('Frame',nil,frame)
+        frame.TargetFrameContainer.FrameTexture=region('Texture')
         frame.TargetFrameContent = {TargetFrameContentMain = main}
         frame.TargetFrameContainer.FrameTexture:SetSize(232, 100)
         function frame:CheckClassification()
@@ -436,3 +476,15 @@ function dispatch(event, ...)
         if frame.scripts.OnEvent then frame.scripts.OnEvent(frame, event, ...) end
     end
 end
+
+-- A minimal real minimap shape, separate from unit/gameplay controllers.
+Minimap=newFrame('Minimap','Minimap',UIParent); Minimap.width=198
+function Frame:SetMaskTexture(path) self.mask=path end
+function Frame:GetMaskTexture() return self.mask or 'native-map-mask' end
+MinimapCluster=newFrame('Frame','MinimapCluster',UIParent)
+MinimapCluster.MinimapContainer=newFrame('Frame',nil,MinimapCluster)
+MinimapCluster.ZoneTextButton=newFrame('Button',nil,MinimapCluster)
+MinimapCluster.ZoneTextButton.StateTexture=region('Texture')
+GameTimeFrame=newFrame('Button','GameTimeFrame',MinimapCluster)
+GameTimeFrame.normal=region('Texture')
+C_DateAndTime={GetCurrentCalendarTime=function() return {monthDay=6} end}

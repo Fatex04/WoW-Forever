@@ -1,5 +1,5 @@
 local _, addon = ...
 
--- This file is loaded only by BetterNameplates_Camelot.toc.
+-- Loaded by all manifest aliases in the Forever distribution.
 addon.isForever = true
 addon.gameFlavor = 'camelot'
