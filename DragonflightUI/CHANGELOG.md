@@ -7,8 +7,9 @@
   to Dragonflight UI Forever - Luna. The public Forever version starts at 1.0.
 - Kept the `DragonflightUI` folder, saved settings and native Luna Classic layout.
 - The Forever-only ZIP includes the native runtime, required embedded libraries,
-  texture assets and attribution/license notices. Classic entry points and BNP
-  are distributed separately.
+  texture assets and attribution/license notices. Classic entry points are
+  excluded from the Forever package.
+- The source repository and release package contain only DragonflightUI.
 
 ## DragonflightUI_Luna V1.7.0 - 6 November 2026 (WoW: Forever)
 
