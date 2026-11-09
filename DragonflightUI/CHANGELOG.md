@@ -1,5 +1,19 @@
 # DragonflightUI_Luna Changelog
 
+## Dragonflight UI Forever - Luna 1.2.1 - 9 November 2026
+
+- Fixed flyout startup failing with a missing `SetFrameRef` method. The combined
+  backdrop/secure template replaces the inherited OnLoad initializer; flyouts
+  now use native `SecureHandlerSetFrameRef` and `SecureHandlerWrapScript`
+  functions directly, retaining the native secure click handlers.
+- Keep flyouts hidden until all ten launchers, popups, slots and movers have
+  finished initializing. Display refreshes, Edit Mode cleanup and disabling
+  flyouts tolerate interrupted initialization without further popup/mover errors.
+- Updated the Lua fixture to model the missing methods on combined templates
+  instead of granting secure helpers to every frame. Added startup-failure
+  injection and Edit Mode/disable checks for the reported error chain.
+- Existing saved actions, settings and character layouts are retained.
+
 ## Dragonflight UI Forever - Luna 1.2 - 9 November 2026
 
 - Added ten Classic-style extra flyout launchers with twelve configurable slots

@@ -274,21 +274,26 @@ function Frame:Clear() self.cooldown=nil; self.durationObject=nil end
 function Region:GetStringHeight() return math.ceil(#tostring(self.text or '')/65)*15 end
 function Region:SetRotation(value) self.rotation=value end
 
-function Frame:SetFrameRef(label,frame)
-    assert(self.secureHandler and not combat,'Invalid secure frame reference update')
-    self.refs=self.refs or {}; self.refs[label]=frame
+function SecureHandlerSetFrameRef(frame,label,reference)
+    assert(frame.protected and not combat,'Invalid secure frame reference update')
+    frame.refs=frame.refs or {}; frame.refs[label]=reference
 end
-function Frame:GetFrameRef(label) return self.refs and self.refs[label] end
-function Frame:RegisterAutoHide(duration) self.autoHide=duration end
-function Frame:AddToAutoHide(frame) self.autoHideParent=frame end
+function Frame:GetFrameRef(label) assert(SECURE_EXECUTION); return self.refs and self.refs[label] end
+function Frame:RegisterAutoHide(duration) assert(SECURE_EXECUTION); self.autoHide=duration end
+function Frame:AddToAutoHide(frame) assert(SECURE_EXECUTION); self.autoHideParent=frame end
 function Frame:CallMethod(method,...)
+    assert(SECURE_EXECUTION)
     local previous=SECURE_EXECUTION; SECURE_EXECUTION=false
     local results={self[method](self,...)}; SECURE_EXECUTION=previous; return unpack(results)
 end
-function Frame:WrapScript(frame,event,pre,post)
-    assert(self.secureHandler and not combat)
+function SecureHandlerWrapScript(frame,event,header,pre,post)
+    assert(header.secureHandler and header.protected and not combat)
     frame.secureWrappers=frame.secureWrappers or {}
-    frame.secureWrappers[event]={owner=self,pre=pre,post=post}
+    frame.secureWrappers[event]={owner=header,pre=pre,post=post}
+end
+function SecureHandler_OnLoad(frame)
+    frame.SetFrameRef=SecureHandlerSetFrameRef
+    frame.WrapScript=function(self,child,event,pre,post) return SecureHandlerWrapScript(child,event,self,pre,post) end
 end
 function runSecure(body,self,control,button,down,message)
     if not body then return end
@@ -335,6 +340,8 @@ function CreateFrame(kind, name, parent, template)
     frame.secureHandler=template and template:find('SecureHandler',1,true)~=nil
     frame.protected=frame.secureButton or frame.secureHandler
     if frame.secureHandler then
+        -- BackdropTemplate is last in the combined template and replaces OnLoad.
+        if template~='SecureHandlerShowHideTemplate,BackdropTemplate' then SecureHandler_OnLoad(frame) end
         frame.scripts.OnClick=function(self,button,down) return runSecure(self:GetAttribute('_onclick'),self,self,button,down) end
         frame.scripts.OnShow=function(self) return runSecure(self:GetAttribute('_onshow'),self,self) end
     elseif frame.secureButton then

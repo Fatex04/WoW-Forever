@@ -1,4 +1,4 @@
-I’ve made my Luna addon compatible with **World of Warcraft: Forever**. **Dragonflight UI Forever - Luna 1.2** is the dedicated download for the Forever client.
+I’ve made my Luna addon compatible with **World of Warcraft: Forever**. **Dragonflight UI Forever - Luna 1.2.1** is the dedicated download for the Forever client.
 
 **Original project:** [**Dragonflight UI Classic**](https://www.curseforge.com/wow/addons/dragonflight-ui-classic) by **KarlHeinz_Schneider**.
 

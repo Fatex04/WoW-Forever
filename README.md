@@ -22,7 +22,7 @@ Forever, and Camelot manifests all target the Forever client in this package.
 ## Release ZIP
 
 Run `python tools/package_forever.py --output-dir <output-directory>` from the
-repository root to build `Dragonflight UI Forever - Luna 1.2.zip`. The builder
+repository root to build `Dragonflight UI Forever - Luna 1.2.1.zip`. The builder
 includes only the `DragonflightUI` folder, its Forever runtime, required libraries,
 artwork and notices. It verifies the archive, manifest references and asset hashes.
 
@@ -31,11 +31,11 @@ select tagged commits. It places `DragonflightUI` directly at the ZIP root and
 excludes development tools and unused Classic code. Only the three Forever
 manifests are present in this repository so automatic version detection targets
 Forever 1.60.1. The Classic manifests remain in the original Classic repository.
-Push a version tag such as `V1.2` after committing the release changes.
+Push a version tag such as `V1.2.1` after committing the release changes.
 
 ## Compatibility notes
 
-Dragonflight UI Forever - Luna 1.2 uses the bundled Luna artwork with a complete visual layer
+Dragonflight UI Forever - Luna 1.2.1 uses the bundled Luna artwork with a complete visual layer
 for player, target, focus, pet and target-of-target frames. Native secure unit
 buttons and unit-data controllers remain active. Opaque health/power values and
 native text are forwarded directly to rendering widgets that accept them; they

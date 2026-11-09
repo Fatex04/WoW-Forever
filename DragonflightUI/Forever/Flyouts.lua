@@ -270,10 +270,12 @@ local receiveSnippet=[[
 ]]
 
 function DF:CreateFlyoutFrames()
-    if self.flyoutRoot then return end
+    if self.flyoutRoot then return self.flyoutFramesReady==true end
+    if InCombatLockdown() then self.pendingFlyouts=true; return false end
     local root=CreateFrame('Frame','DragonflightUIForeverFlyouts',UIParent,'SecureHandlerBaseTemplate')
+    root:Hide()
     root:SetSize(1,1); root:SetPoint('BOTTOMLEFT'); root:EnableMouse(false)
-    self.flyoutRoot=root; self.flyoutButtons={}
+    self.flyoutRoot=root; self.flyoutButtons={}; self.flyoutFramesReady=false
     RegisterStateDriver(root,'cursor','[cursor] true; false')
     RegisterStateDriver(root,'combat','[combat] true; false')
     for index=1,COUNT do
@@ -284,7 +286,7 @@ function DF:CreateFlyoutFrames()
         IconButton(launcher)
         launcher:RegisterForClicks('LeftButtonUp','RightButtonUp')
         launcher:SetAttribute('_onclick',openSnippet)
-        launcher:SetFrameRef('controller',root)
+        SecureHandlerSetFrameRef(launcher,'controller',root)
         launcher.Label=launcher:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
         launcher.Label:SetPoint('TOP',launcher,'BOTTOM',0,-3); launcher.Label:SetWidth(74)
         launcher.Label:SetWordWrap(false); launcher.Label:SetMaxLines(1)
@@ -299,10 +301,12 @@ function DF:CreateFlyoutFrames()
         popup:SetBackdrop({bgFile='Interface\\Buttons\\WHITE8X8',edgeFile='Interface\\Buttons\\WHITE8X8',edgeSize=1})
         popup:SetBackdropColor(0.025,0.02,0.04,0.96); popup:SetBackdropBorderColor(0.5,0.35,0.65,1)
         popup:SetAttribute('_onshow',[[self:RegisterAutoHide(0.5); self:AddToAutoHide(self:GetParent())]])
-        popup:SetFrameRef('controller',root)
+        -- BackdropTemplate replaces the inherited SecureHandler OnLoad. Use the
+        -- native functions instead of relying on its optional helper methods.
+        SecureHandlerSetFrameRef(popup,'controller',root)
         popup:HookScript('OnShow',function() DF:RefreshFlyoutDisplays() end)
         popup:Hide(); launcher.popup=popup; launcher.slots={}
-        launcher:SetFrameRef('popup',popup); root:SetFrameRef('popup'..index,popup)
+        SecureHandlerSetFrameRef(launcher,'popup',popup); SecureHandlerSetFrameRef(root,'popup'..index,popup)
         for slot=1,SLOTS do
             local child=CreateFrame('Button',launcher:GetName() .. 'Slot' .. slot,popup,'SecureActionButtonTemplate')
             launcher.slots[slot]=child; child.index=index; child.slot=slot
@@ -310,7 +314,7 @@ function DF:CreateFlyoutFrames()
             child:RegisterForClicks('LeftButtonUp','RightButtonUp'); child:RegisterForDrag('LeftButton')
             child:SetAttribute('useOnKeyDown',false)
             child.ReceiveLunaAction=function() DF:ReceiveFlyoutAction(index,slot) end
-            popup:WrapScript(child,'OnClick',receiveSnippet,closeSnippet)
+            SecureHandlerWrapScript(child,'OnClick',popup,receiveSnippet,closeSnippet)
             child:SetScript('OnReceiveDrag',function() DF:ReceiveFlyoutAction(index,slot) end)
             child:SetScript('OnDragStart',function()
                 if IsShiftKeyDown and IsShiftKeyDown() then DF:PickupFlyoutAction(index,slot) end
@@ -346,6 +350,8 @@ function DF:CreateFlyoutFrames()
             if button=='RightButton' then DF:ToggleFlyoutEditor(index) end
         end)
     end
+    self.flyoutFramesReady=true
+    return true
 end
 
 function DF:SaveFlyoutPosition(launcher)
@@ -392,10 +398,10 @@ function DF:PaintFlyoutAction(button,action)
 end
 
 function DF:RefreshFlyoutDisplays()
-    if not self.flyoutButtons or not self.flyoutData then return end
+    if not self.flyoutFramesReady or not self.flyoutButtons or not self.flyoutData then return end
     for _,launcher in ipairs(self.flyoutButtons) do
-        if launcher.popup:IsShown() then
-            for slot,child in ipairs(launcher.slots) do self:PaintFlyoutAction(child,self.flyoutData.bars[launcher.index].entries[slot]) end
+        if launcher.popup and launcher.popup:IsShown() then
+            for slot,child in ipairs(launcher.slots or {}) do self:PaintFlyoutAction(child,self.flyoutData.bars[launcher.index].entries[slot]) end
         end
     end
     if self.flyoutEditor and self.flyoutEditor:IsShown() then self:RefreshFlyoutEditorSlots() end
@@ -411,17 +417,23 @@ function DF:RefreshFlyouts()
     if InCombatLockdown() then self.pendingFlyouts=true; return end
     self.pendingFlyouts=false
     if not self.active or not self.settings.enabled or not self.settings.flyouts then
-        self.moduleStatus.Flyouts={enabled=false,setupCompleted=self.flyoutRoot~=nil,native=false}
+        self.moduleStatus.Flyouts={enabled=false,setupCompleted=self.flyoutFramesReady==true,native=false}
         if self.flyoutRoot then
             if ClearOverrideBindings then ClearOverrideBindings(self.flyoutRoot) end
             self.flyoutRoot:Hide()
-            for _,launcher in ipairs(self.flyoutButtons) do launcher.popup:Hide(); launcher.mover:Hide() end
+            for _,launcher in ipairs(self.flyoutButtons or {}) do
+                if launcher.popup then launcher.popup:Hide() end
+                if launcher.mover then launcher.mover:Hide() end
+            end
         end
         return
     end
     if not self:InitializeFlyouts() then return end
     self:RefreshFlyoutPresets()
-    self:CreateFlyoutFrames()
+    if not self:CreateFlyoutFrames() then
+        self.moduleStatus.Flyouts={enabled=false,setupCompleted=false,native=false}
+        return
+    end
     if ClearOverrideBindings then ClearOverrideBindings(self.flyoutRoot) end
     self.flyoutRoot:Show()
     local editing=self.editModeSession~=nil
@@ -472,9 +484,11 @@ end
 
 function DF:RefreshFlyoutMovers()
     for _,launcher in ipairs(self.flyoutButtons or {}) do
-        local bar=self.flyoutData.bars[launcher.index]
-        launcher.mover:SetShown(self.active and self.settings.enabled and self.settings.flyouts and
-            self.editModeSession~=nil and not InCombatLockdown() and bar.enabled)
+        if launcher.mover then
+            local bar=self.flyoutData and self.flyoutData.bars[launcher.index]
+            launcher.mover:SetShown(self.flyoutFramesReady and self.active and self.settings.enabled and self.settings.flyouts and
+                self.editModeSession~=nil and not InCombatLockdown() and bar and bar.enabled or false)
+        end
     end
 end
 

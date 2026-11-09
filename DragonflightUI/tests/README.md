@@ -1,6 +1,6 @@
 Run the regression checks from the `DragonflightUI` directory:
 
-Dragonflight UI Forever - Luna 1.2:
+Dragonflight UI Forever - Luna 1.2.1:
 
 ```text
 python -m pip install lupa
@@ -23,6 +23,10 @@ and reject protected configuration changes in combat. They cover cursor placemen
 without casting, class presets, per-character settings, bindings, mover cleanup,
 private cooldown objects/counts, and the update notice's account-wide version
 marker. The simulated secure-action dispatcher is not WoW's execution engine.
+Combined secure/backdrop templates model the inherited OnLoad replacement and
+missing per-frame helper methods. Injected popup initialization failure checks
+that the partial root remains hidden and display, Edit Mode and disable cleanup
+do not produce follow-up errors.
 
 Additional 1.2 client checks:
 

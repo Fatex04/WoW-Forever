@@ -80,6 +80,45 @@ class Flyouts(unittest.TestCase):
         lua.execute("DF.flyoutButtons[2]:Click('LeftButton')")
         self.assertFalse(lua.eval('DF.flyoutButtons[2].popup:IsShown()'))
 
+    def test_combined_backdrop_popup_has_no_secure_onload_helpers(self):
+        lua=self.boot()
+        self.assertIsNone(lua.eval('launcher.popup.SetFrameRef'))
+        self.assertIsNone(lua.eval('launcher.popup.WrapScript'))
+        self.assertTrue(lua.eval('DF.flyoutFramesReady'))
+        self.assertTrue(lua.eval('launcher.popup.refs.controller==DF.flyoutRoot'))
+        self.assertTrue(lua.eval('launcher.slots[1].secureWrappers.OnClick.owner==launcher.popup'))
+        self.assertTrue(lua.eval('DF:CreateFlyoutFrames()'))
+
+    def test_failed_popup_initialization_stays_hidden_and_does_not_cascade(self):
+        lua=native.NativeRuntime().load_runtime(before=PLAYER+"""
+            originalFrameRef=SecureHandlerSetFrameRef
+            SecureHandlerSetFrameRef=function(frame,label,reference)
+                if frame:GetName()=='DragonflightUIForeverFlyout1Popup' then error('Injected popup initialization failure') end
+                return originalFrameRef(frame,label,reference)
+            end
+        """)
+        lua.execute("""
+            startupOK,startupError=pcall(function()
+                dispatch('ADDON_LOADED','DragonflightUI'); loggedIn=true; dispatch('PLAYER_LOGIN'); flushTimers()
+            end)
+            DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
+            SecureHandlerSetFrameRef=originalFrameRef
+        """)
+        self.assertFalse(lua.eval('startupOK'))
+        self.assertIn('Injected popup initialization failure',lua.eval('startupError'))
+        self.assertFalse(lua.eval('DF.flyoutFramesReady'))
+        self.assertIsNone(lua.eval('DF.flyoutButtons[1].popup'))
+        self.assertIsNone(lua.eval('DF.flyoutButtons[1].mover'))
+        self.assertFalse(lua.eval('DF.flyoutRoot:IsShown()'))
+        lua.execute("""
+            DF:RefreshFlyoutDisplays(); DF:RefreshFlyoutMovers(); DF:RefreshFlyouts()
+            DF:OpenLunaEditMode(); HideUIPanel(EditModeManagerFrame); flushTimers()
+            DF.settings.flyouts=false; DF:RefreshFlyouts(); DF:OnDisable(); flushTimers()
+        """)
+        self.assertFalse(lua.eval('DF.moduleStatus.Flyouts.setupCompleted'))
+        self.assertFalse(lua.eval('DF.flyoutRoot:IsShown()'))
+        self.assertEqual(lua.eval('#reportedErrors'),0)
+
     def test_secure_spell_click_works_in_combat_and_preserves_original_handler(self):
         lua=self.boot()
         lua.execute("DF:SetFlyoutAction(1,1,{type='spell',value=1752}); enterCombat(true); launcher:Click('LeftButton'); launcher.slots[1]:Click('LeftButton')")
@@ -225,16 +264,16 @@ class UpdateNotice(unittest.TestCase):
     def test_first_login_shows_notes_once_per_forever_version(self):
         lua=self.boot()
         self.assertTrue(lua.eval('DragonflightUIForeverChangelog:IsShown()'))
-        self.assertEqual(lua.eval('DragonflightUIDB.global.lastForeverUpdateNoticeVersion'),'1.2')
+        self.assertEqual(lua.eval('DragonflightUIDB.global.lastForeverUpdateNoticeVersion'),'1.2.1')
         lua.execute("DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF.updateNotice:Hide(); dispatch('PLAYER_ENTERING_WORLD'); DF:QueueUpdateNotice(); flushTimers()")
         self.assertFalse(lua.eval('DF.updateNotice:IsShown()'))
 
     def test_reload_profile_and_character_changes_do_not_repeat_seen_notes(self):
-        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2'},profiles={Another={}}}")
+        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2.1'},profiles={Another={}}}")
         self.assertIsNone(lua.eval('DragonflightUIForeverChangelog'))
 
     def test_new_version_ignores_classic_notice_marker(self):
-        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.1',lastUpdateNoticeVersion='1.3.2'}}")
+        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2',lastUpdateNoticeVersion='1.3.2'}}")
         self.assertTrue(lua.eval('DragonflightUIForeverChangelog:IsShown()'))
         self.assertEqual(lua.eval('DragonflightUIDB.global.lastUpdateNoticeVersion'),'1.3.2')
 
@@ -246,7 +285,7 @@ class UpdateNotice(unittest.TestCase):
         self.assertTrue(lua.eval('DragonflightUIForeverChangelog:IsShown()'))
 
     def test_manual_reopen_and_discord_link_remain_selectable(self):
-        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2'}}")
+        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2.1'}}")
         lua.execute("DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:HandleCommand('discord'); link=DF.updateNotice.DiscordLink; link:SetFocus()")
         self.assertEqual(lua.eval('link:GetText()'),'https://discord.gg/ZfYDHV6Qgs')
         self.assertTrue(lua.eval('link.highlighted'))
@@ -261,7 +300,7 @@ class UpdateNotice(unittest.TestCase):
         self.assertTrue(lua.eval('DragonflightUIForeverChangelog:IsShown()'))
 
     def test_patchnotes_can_be_opened_manually_inside_edit_mode(self):
-        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2'}}")
+        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2.1'}}")
         lua.execute("DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:OpenLunaEditMode(); DF:ShowUpdateNotice(true)")
         self.assertTrue(lua.eval('DF.updateNotice:IsShown()'))
         self.assertTrue(lua.eval('EditModeManagerFrame:IsEditModeActive()'))

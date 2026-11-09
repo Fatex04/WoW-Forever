@@ -1,6 +1,6 @@
 # Dragonflight UI Forever - Luna
 
-Dragonflight UI Forever - Luna 1.2 is the dedicated WoW: Forever (Camelot) edition
+Dragonflight UI Forever - Luna 1.2.1 is the dedicated WoW: Forever (Camelot) edition
 of the independently maintained DragonflightUI_Luna fork of Dragonflight UI Classic.
 Its public Forever version starts at 1.0; earlier Forever engineering builds used
 the 1.4–1.7 version series. The addon folder remains `DragonflightUI` so texture
@@ -21,7 +21,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the release history.
 
 ## WoW Forever (Camelot)
 
-Version 1.2 uses a dedicated native Forever runtime under `Forever/`. The bare,
+Version 1.2.1 uses a dedicated native Forever runtime under `Forever/`. The bare,
 `_Forever`, and `_Camelot` manifests all target interface 16001 and load this same
 runtime. The Classic FrameXML replacements and global legacy API aliases are not
 loaded by these manifests.

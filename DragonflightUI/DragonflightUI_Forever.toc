@@ -11,7 +11,7 @@
 ## X-Upstream: https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI
 ## X-Upstream-Version: v0.40.3 / b8b35451d4621a8097e887385f72ec03e17765f1
 ## X-Upstream-CurseForge: https://www.curseforge.com/wow/addons/dragonflight-ui-classic
-## Version: 1.2
+## Version: 1.2.1
 ## X-Date: 20261109
 ## X-GameFlavor: World of Warcraft: Forever (Camelot)
 ## Category: UI Overhaul

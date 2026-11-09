@@ -5,6 +5,13 @@ local function T(en, de) return german and de or en end
 
 DF.discordURL = 'https://discord.gg/ZfYDHV6Qgs'
 DF.releaseNotes = {
+    T('Flyout startup hotfix', 'Hotfix für den Flyout-Start'),
+    T('Fixed the missing secure helper on flyout popups. All ten launchers and their slots now finish initializing with the Forever client templates.',
+      'Fehlende Secure-Hilfsmethode am Flyout-Popup behoben. Alle zehn Knöpfe und ihre Plätze werden mit den Forever-Clientvorlagen vollständig aufgebaut.'),
+    T('Incomplete flyouts stay hidden. Cooldown updates and opening or closing Edit Mode no longer cause follow-up popup or mover errors after an interrupted startup.',
+      'Unvollständige Flyouts bleiben ausgeblendet. Cooldown-Updates sowie das Öffnen und Schließen des Edit Mode verursachen nach einem abgebrochenen Start keine Folgefehler bei Popup oder Verschieberahmen mehr.'),
+    T('Your saved flyout actions, shortcuts, positions and layouts are retained.',
+      'Gespeicherte Flyout-Aktionen, Tastenkürzel, Positionen und Layouts bleiben erhalten.'),
     T('Classic-style extra flyouts', 'Zusätzliche Flyouts wie in Classic'),
     T('Ten configurable flyout buttons with twelve slots each: drag spells, items, toys, mounts, macros or equipment sets onto a slot.',
       'Zehn konfigurierbare Flyout-Knöpfe mit je zwölf Plätzen: Zauber, Gegenstände, Spielzeuge, Reittiere, Makros oder Ausrüstungssets auf einen Platz ziehen.'),

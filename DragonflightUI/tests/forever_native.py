@@ -30,7 +30,7 @@ def files_in_manifest(path):
 
 
 class NativeRuntime(unittest.TestCase):
-    def boot(self, before='', saved_variables=''):
+    def load_runtime(self, before='', saved_variables=''):
         lua = LuaRuntime(unpack_returned_tuples=True)
         lua.execute((ROOT / 'tests/forever_native_fixture.lua').read_text(encoding='utf-8'))
         if before:
@@ -40,6 +40,10 @@ class NativeRuntime(unittest.TestCase):
             lua.execute(path.read_text(encoding='utf-8-sig'), 'DragonflightUI', namespace, name=str(path))
         if saved_variables:
             lua.execute(saved_variables)
+        return lua
+
+    def boot(self, before='', saved_variables=''):
+        lua = self.load_runtime(before=before, saved_variables=saved_variables)
         lua.execute("dispatch('ADDON_LOADED', 'DragonflightUI'); loggedIn = true; dispatch('PLAYER_LOGIN'); flushTimers()")
         self.assertEqual(lua.eval('#reportedErrors'), 0, list(lua.globals().reportedErrors.values()))
         self.assertEqual(lua.eval("DragonflightUI_API.Version.InterfaceVersion"), 16001)
@@ -48,7 +52,7 @@ class NativeRuntime(unittest.TestCase):
     def test_real_manifest_starts_with_current_build(self):
         lua = self.boot()
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.nativeRuntime'))
-        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.2')
+        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.2.1')
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.modules.Actionbar.setupCompleted'))
         self.assertIsNone(lua.eval('MainMenuBarLeftEndCap'))
         self.assertIsNone(lua.eval('MirrorTimer1'))
