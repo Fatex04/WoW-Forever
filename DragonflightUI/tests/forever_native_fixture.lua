@@ -115,6 +115,7 @@ local Frame = {}
 Frame.__index = Frame
 local function geometryAllowed(self)
     assert(not self.gameplay, 'Modified protected gameplay geometry or lifetime: ' .. tostring(self.name))
+    assert(not (combat and self.protected and not SECURE_EXECUTION), 'Changed addon protected geometry in combat')
 end
 local function newFrame(kind, name, parent)
     local frame = setmetatable({kind = kind, name = name, parent = parent, children = {},
@@ -214,7 +215,12 @@ function Frame:GetDisabledTexture() return self.disabled end
 function Frame:Click(button) if self.scripts.OnClick then return self.scripts.OnClick(self,button) end end
 function Frame:GetValue() return self.value end
 function Frame:GetMinMaxValues() return self.low, self.high end
-function Frame:SetAttribute(key,value) assert(not self.gameplay and self.secureButton,'Must not replace secure native actions'); self.attributes=self.attributes or {}; self.attributes[key]=value end
+function Frame:SetAttribute(key,value)
+    assert(not self.gameplay and (self.secureButton or self.secureHandler),'Must not replace secure native actions')
+    assert(not (combat and not SECURE_EXECUTION),'Changed protected attributes in combat')
+    self.attributes=self.attributes or {}; self.attributes[key]=value
+end
+function Frame:GetAttribute(key) return self.attributes and self.attributes[key] end
 function Frame:RegisterForClicks() end
 function Frame:Disable() self.disabled=true end
 function Frame:SetNormalTexture(path) self.normal = region('Texture'); self.normal:SetTexture(path) end
@@ -236,14 +242,110 @@ function Frame:SetValue(value)
     if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, value) end
 end
 function Frame:GetText() return self.text end
-function Frame:SetText(text) self.text = text end
+function Frame:SetText(text)
+    self.text = text
+    if self.scripts.OnTextChanged then self.scripts.OnTextChanged(self,false) end
+end
 function Frame:MarkDirty() self.dirty = true end
+function Frame:SetAutoFocus(value) self.autoFocus=value end
+function Frame:SetFontObject(value) self.fontObject=value end
+function Frame:SetMaxLetters(value) self.maxLetters=value end
+function Frame:SetCursorPosition(value) self.cursorPosition=value end
+function Frame:HighlightText() self.highlighted=true end
+function Frame:SetFocus()
+    for _,frame in ipairs(frames) do if frame~=self and frame.focused then frame:ClearFocus() end end
+    self.focused=true
+    if self.scripts.OnEditFocusGained then self.scripts.OnEditFocusGained(self) end
+end
+function Frame:ClearFocus()
+    local focused=self.focused; self.focused=false
+    if focused and self.scripts.OnEditFocusLost then self.scripts.OnEditFocusLost(self) end
+end
+function Frame:SetScrollChild(child) self.scrollChild=child end
+function Frame:SetVerticalScroll(value) self.verticalScroll=value end
+function Frame:SetHighlightTexture(path) self.highlight=region('Texture'); self.highlight:SetTexture(path) end
+function Frame:SetDrawEdge(value) self.drawEdge=value end
+function Frame:SetCooldown(start,duration)
+    assert(not issecretvalue(start) and not issecretvalue(duration),'Forwarded restricted raw cooldown data')
+    self.cooldown={start,duration}
+end
+function Frame:SetCooldownFromDurationObject(duration) self.durationObject=duration end
+function Frame:Clear() self.cooldown=nil; self.durationObject=nil end
+function Region:GetStringHeight() return math.ceil(#tostring(self.text or '')/65)*15 end
+function Region:SetRotation(value) self.rotation=value end
+
+function Frame:SetFrameRef(label,frame)
+    assert(self.secureHandler and not combat,'Invalid secure frame reference update')
+    self.refs=self.refs or {}; self.refs[label]=frame
+end
+function Frame:GetFrameRef(label) return self.refs and self.refs[label] end
+function Frame:RegisterAutoHide(duration) self.autoHide=duration end
+function Frame:AddToAutoHide(frame) self.autoHideParent=frame end
+function Frame:CallMethod(method,...)
+    local previous=SECURE_EXECUTION; SECURE_EXECUTION=false
+    local results={self[method](self,...)}; SECURE_EXECUTION=previous; return unpack(results)
+end
+function Frame:WrapScript(frame,event,pre,post)
+    assert(self.secureHandler and not combat)
+    frame.secureWrappers=frame.secureWrappers or {}
+    frame.secureWrappers[event]={owner=self,pre=pre,post=post}
+end
+function runSecure(body,self,control,button,down,message)
+    if not body then return end
+    local previous=SECURE_EXECUTION; SECURE_EXECUTION=true
+    local callback=assert(loadstring(body,'secure snippet'))
+    setfenv(callback,setmetatable({self=self,control=control,button=button,down=down,message=message},{__index=_G}))
+    local function pack(...) return {n=select('#',...),...} end
+    local results=pack(callback()); SECURE_EXECUTION=previous; return unpack(results,1,results.n)
+end
+function Frame:Click(button,down)
+    button=button or 'LeftButton'
+    local wrapped=self.secureWrappers and self.secureWrappers.OnClick
+    local replacement,message
+    if wrapped then
+        replacement,message=runSecure(wrapped.pre,self,wrapped.owner,button,down)
+        if replacement==false then return end
+        if replacement then button=tostring(replacement) end
+    end
+    local result
+    if self.scripts.OnClick then result=self.scripts.OnClick(self,button,down) end
+    if wrapped and message~=nil then runSecure(wrapped.post,self,wrapped.owner,button,down,message) end
+    for _,callback in ipairs(self.scriptHooks.OnClick or {}) do callback(self,button,down) end
+    return result
+end
+stateDrivers, overrideBindings, secureActions = {}, {}, {}
+function RegisterStateDriver(frame,key,condition)
+    assert(not combat); stateDrivers[frame]=stateDrivers[frame] or {}; stateDrivers[frame][key]=condition
+    frame:SetAttribute('state-'..key,'false')
+end
+function ClearOverrideBindings(owner) assert(not combat); overrideBindings[owner]={} end
+function SetOverrideBindingClick(owner,_,key,name,button)
+    assert(not combat); overrideBindings[owner]=overrideBindings[owner] or {}; overrideBindings[owner][key]={name,button}
+end
 
 function CreateFrame(kind, name, parent, template)
-    assert(not template or template == 'BackdropTemplate' or template == 'SecureActionButtonTemplate,BackdropTemplate', 'Unexpected UI template: ' .. tostring(template))
+    local allowed={BackdropTemplate=true,['SecureActionButtonTemplate,BackdropTemplate']=true,
+        SecureHandlerBaseTemplate=true,SecureHandlerClickTemplate=true,
+        ['SecureHandlerShowHideTemplate,BackdropTemplate']=true,SecureActionButtonTemplate=true,
+        CooldownFrameTemplate=true,InputBoxTemplate=true,UIPanelCloseButton=true,UIPanelScrollFrameTemplate=true}
+    assert(not template or allowed[template], 'Unexpected UI template: ' .. tostring(template))
     if template then requestedTemplates[#requestedTemplates + 1] = template end
     local frame=newFrame(kind,name,parent)
-    frame.secureButton=template=='SecureActionButtonTemplate,BackdropTemplate'
+    frame.secureButton=template=='SecureActionButtonTemplate,BackdropTemplate' or template=='SecureActionButtonTemplate'
+    frame.secureHandler=template and template:find('SecureHandler',1,true)~=nil
+    frame.protected=frame.secureButton or frame.secureHandler
+    if frame.secureHandler then
+        frame.scripts.OnClick=function(self,button,down) return runSecure(self:GetAttribute('_onclick'),self,self,button,down) end
+        frame.scripts.OnShow=function(self) return runSecure(self:GetAttribute('_onshow'),self,self) end
+    elseif frame.secureButton then
+        frame.scripts.OnClick=function(self,button,down)
+            if button=='LeftButton' and not down then
+                local action=self:GetAttribute('type1') or self:GetAttribute('type')
+                if action then secureActions[#secureActions+1]={action,self:GetAttribute(action),self} end
+            end
+        end
+        frame.nativeSecureClick=frame.scripts.OnClick
+    end
     return frame
 end
 UIParent = newFrame('Frame', 'UIParent')

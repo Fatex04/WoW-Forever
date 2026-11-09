@@ -22,7 +22,7 @@ Forever, and Camelot manifests all target the Forever client in this package.
 ## Release ZIP
 
 Run `python tools/package_forever.py --output-dir <output-directory>` from the
-repository root to build `Dragonflight UI Forever - Luna 1.1.zip`. The builder
+repository root to build `Dragonflight UI Forever - Luna 1.2.zip`. The builder
 includes only the `DragonflightUI` folder, its Forever runtime, required libraries,
 artwork and notices. It verifies the archive, manifest references and asset hashes.
 
@@ -31,11 +31,11 @@ select tagged commits. It places `DragonflightUI` directly at the ZIP root and
 excludes development tools and unused Classic code. Only the three Forever
 manifests are present in this repository so automatic version detection targets
 Forever 1.60.1. The Classic manifests remain in the original Classic repository.
-Push a version tag such as `V1.1` after committing the release changes.
+Push a version tag such as `V1.2` after committing the release changes.
 
 ## Compatibility notes
 
-Dragonflight UI Forever - Luna 1.1 uses the bundled Luna artwork with a complete visual layer
+Dragonflight UI Forever - Luna 1.2 uses the bundled Luna artwork with a complete visual layer
 for player, target, focus, pet and target-of-target frames. Native secure unit
 buttons and unit-data controllers remain active. Opaque health/power values and
 native text are forwarded directly to rendering widgets that accept them; they
@@ -52,11 +52,20 @@ Native panel chrome also receives Luna artwork, including load-on-demand
 Forever panels. `/df windows` opens a window catalog with secure native click
 shortcuts. Features missing or locked in the client remain unavailable there.
 
+`/df flyouts` opens the ten extra flyouts with twelve slots each. Drag spells,
+items, toys, mounts, macros or equipment sets onto a slot. Configure each
+character's directions, sizes, shortcuts and names, and move the launchers in
+Luna Edit Mode. Mage and warlock presets use known class spells.
+
+Patchnotes with a selectable Discord invite appear once per account after each
+Forever version update. `/df patchnotes` or `/df discord` reopens the window;
+click the invite and press Ctrl+C to copy it.
+
 Lua 5.1 regression fixtures cover startup, secure handler preservation, opaque
 value forwarding, layout copying, editor behavior and panel restoration.
 These do not emulate the WoW taint engine; live client checks
-are also necessary. Classic-only favorite flyouts and replacement aura headers
-remain outside the Forever runtime.
+are also necessary. Classic replacement aura headers remain outside the Forever
+runtime; the extra flyouts use their own Forever implementation.
 
 ## Origins and licenses
 

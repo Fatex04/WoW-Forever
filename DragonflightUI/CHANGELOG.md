@@ -1,5 +1,30 @@
 # DragonflightUI_Luna Changelog
 
+## Dragonflight UI Forever - Luna 1.2 - 9 November 2026
+
+- Added ten Classic-style extra flyout launchers with twelve configurable slots
+  each. Spells, items, toys, mounts, named macros and equipment sets can be added
+  by drag-and-drop or configured through `/df flyouts`.
+- Added per-character settings for names, icons, opening direction, columns,
+  scale, shortcuts and closing after a click. Extra launchers can be moved in
+  Luna HUD Edit Mode. Mage and warlock presets include known class spells and
+  stop updating automatically when the player customizes that flyout.
+- Added protected launcher snippets and native secure action buttons. Cursor
+  placement suppresses spell execution; action, layout and binding changes wait
+  until combat ends. Native action bars and their click handlers are retained.
+- Added an update window with current patchnotes, Luna artwork and a selectable
+  Discord invite. It appears once per account for each Forever addon version,
+  defers automatic display during combat/Edit Mode and can be reopened with
+  `/df patchnotes`, `/df discord`, Luna settings or the HUD editor.
+- Finished appearance/flyout cleanup after combat if the addon is disabled
+  during combat. Existing profiles and Forever layouts remain intact.
+- Coalesced item-cache/cooldown display updates without rebuilding protected
+  flyout frames or replacing unfinished editor text. Opening a popup refreshes
+  its counts and cooldown displays immediately.
+- Added regression checks for secure popup snippets, combat deferral, cursor
+  assignment, character persistence, editor controls, private cooldown output
+  and once-per-version update notices.
+
 ## Dragonflight UI Forever - Luna 1.1 - 6 November 2026
 
 - Added repository-root CurseForge packaging metadata for automatic tagged releases.

@@ -284,6 +284,7 @@ function DF:ApplyTheme()
     self:StyleLunaWindows(enabled and self.settings.windows)
     self:StyleLunaMinimap(enabled and self.settings.minimap)
     self:RefreshLunaEditMode()
+    self:RefreshFlyouts()
     for name, key in pairs({Actionbar = 'actionbars', Unitframe = 'unitframes', Buffs = 'auras', Castbar = 'castbars', Tooltip = 'tooltip', Minimap = 'minimap'}) do
         self.moduleStatus[name] = {enabled = enabled and self.settings[key] == true, setupCompleted = true, native = true}
     end

@@ -3,7 +3,7 @@ local DF = LibStub('AceAddon-3.0'):NewAddon('DragonflightUI', 'AceConsole-3.0')
 ns.DF = DF
 DF.IsForever = true
 -- A running client can cache TOC metadata until its next full restart.
-DF.version = '1.1'
+DF.version = '1.2'
 DF.title = 'Dragonflight UI Forever - Luna'
 DF.API = {Version = {
     InterfaceVersion = tonumber((select(4, GetBuildInfo()))) or 0,
@@ -12,7 +12,7 @@ DF.API = {Version = {
 DragonflightUI_API = DF.API
 
 DF.defaults = {
-    enabled = true, frameTint = false, minimap = true, lunaEditMode = true, windows = true,
+    enabled = true, frameTint = false, minimap = true, lunaEditMode = true, windows = true, flyouts = true,
     actionbars = true, actionbarBorders = true, hideBarArt = true,
     hotkeys = true, macroNames = true, hotkeySize = 12, macroSize = 11,
     unitframes = true, unitArt = true, unitTextures = true, unitFontScale = 1,
@@ -94,13 +94,18 @@ function DF:OnInitialize()
 end
 
 function DF:HandleCommand(input)
-    local command = (input or ''):lower():match('^%s*(%S*)')
+    local command, argument = (input or ''):match('^%s*(%S*)%s*(.-)%s*$')
+    command = command:lower()
     if command == 'classic' then
         if InCombatLockdown() then self:Print('Luna Classic: outside combat only.'); return end
         self:ApplyClassicReferenceLayout(true)
         self:QueueRefresh()
     elseif command == 'windows' or command == 'fenster' then
         self:ToggleWindowBrowser()
+    elseif command == 'flyouts' or command == 'flyout' then
+        self:ToggleFlyoutEditor(tonumber(argument))
+    elseif command == 'patchnotes' or command == 'changelog' or command == 'discord' then
+        self:ShowUpdateNotice(true)
     elseif command == 'debug' then
         self:Print(self.version .. ' | Luna frames, bars, minimap | windows: ' .. tostring(self.styledWindowCount or 0))
         for _, entry in ipairs(errors) do self:Print(entry.message) end
@@ -116,16 +121,20 @@ function DF:OnEnable()
     if EventRegistry and not self.layoutHooked then
         self.layoutHooked = true
         EventRegistry:RegisterCallback('EditMode.Exit', self.QueueRefresh, self)
+        EventRegistry:RegisterCallback('EditMode.Exit', self.QueueUpdateNotice, self)
         EventRegistry:RegisterCallback('EditMode.SavedLayouts', self.QueueRefresh, self)
     end
     self:QueueRefresh()
+    self:QueueUpdateNotice()
     self:Print(self.version .. ' — /df')
 end
 
 function DF:OnDisable()
     self.active = false
     self:EndLunaEditMode()
-    if not InCombatLockdown() then self:ApplyTheme() end
+    if self.updateNotice then self.updateNotice:Hide() end
+    self:RefreshFlyouts()
+    if not InCombatLockdown() then self:ApplyTheme() else self.pendingThemeDisable=true end
 end
 
 function DF:QueueRefresh()
@@ -222,13 +231,30 @@ for _, event in ipairs({
     'UNIT_DISPLAYPOWER', 'UNIT_NAME_UPDATE', 'UNIT_PORTRAIT_UPDATE', 'UNIT_LEVEL', 'UNIT_FLAGS',
     'PLAYER_UPDATE_RESTING'
 }) do events:RegisterEvent(event) end
+local flyoutDisplayEvents = {'SPELL_UPDATE_COOLDOWN','SPELL_UPDATE_CHARGES','ACTIONBAR_UPDATE_COOLDOWN','BAG_UPDATE_DELAYED','GET_ITEM_INFO_RECEIVED'}
+local flyoutDataEvents = {UPDATE_MACROS=true,EQUIPMENT_SETS_CHANGED=true}
+local displayEvents = {}
+for _, event in ipairs(flyoutDisplayEvents) do displayEvents[event]=true; events:RegisterEvent(event) end
+for event in pairs(flyoutDataEvents) do events:RegisterEvent(event) end
 events:SetScript('OnEvent', function(_, event)
+    if displayEvents[event] then if DF.active then DF:QueueFlyoutDisplays() end; return end
+    if flyoutDataEvents[event] then
+        if DF.active then DF:RefreshFlyouts() end
+        return
+    end
+    if event == 'PLAYER_REGEN_ENABLED' and DF.pendingFlyouts then DF:RefreshFlyouts() end
+    if event == 'PLAYER_REGEN_ENABLED' and DF.pendingThemeDisable then
+        DF.pendingThemeDisable=false
+        DF:ApplyTheme()
+    end
     if DF.UpdateLunaUnitVisuals and DF.active then DF:UpdateLunaUnitVisuals(portraitEvents[event]) end
     if visualEvents[event] then return end
     if event == 'PLAYER_LOGOUT' then
         DF:SaveDiagnostics()
     elseif event == 'PLAYER_REGEN_DISABLED' then
         DF:EndLunaEditMode()
+        DF:RefreshFlyoutMovers()
+        if DF.flyoutEditor then DF.flyoutEditor:Hide() end
     elseif DF.active then
         if event == 'ADDON_LOADED' then
             DF:InstallGameMenuEntry()
@@ -236,5 +262,6 @@ events:SetScript('OnEvent', function(_, event)
             DF:InstallLunaEditMode()
         end
         DF:QueueRefresh()
+        if event == 'PLAYER_ENTERING_WORLD' or event == 'PLAYER_REGEN_ENABLED' then DF:QueueUpdateNotice() end
     end
 end)

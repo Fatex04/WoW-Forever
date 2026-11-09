@@ -11,8 +11,8 @@
 ## X-Upstream: https://github.com/Karl-HeinzSchneider/WoW-DragonflightUI
 ## X-Upstream-Version: v0.40.3 / b8b35451d4621a8097e887385f72ec03e17765f1
 ## X-Upstream-CurseForge: https://www.curseforge.com/wow/addons/dragonflight-ui-classic
-## Version: 1.1
-## X-Date: 20261106
+## Version: 1.2
+## X-Date: 20261109
 ## X-GameFlavor: World of Warcraft: Forever (Camelot)
 ## Category: UI Overhaul
 ## Category-deDE: UI-Überholung
@@ -26,7 +26,7 @@
 ## Category-zhCN: UI重构
 ## Category-zhTW: UI重構
 ## SavedVariables: DragonflightUIDB
-## OptionalDeps: Ace3, Blizzard_EditMode, Blizzard_ActionBar, Blizzard_UnitFrame, Blizzard_BuffFrame, Blizzard_UIPanels_Game, Blizzard_GameMenu, Blizzard_MirrorTimer
+## OptionalDeps: Ace3, Blizzard_EditMode, Blizzard_ActionBar, Blizzard_UnitFrame, Blizzard_BuffFrame, Blizzard_UIPanels_Game, Blizzard_GameMenu, Blizzard_MirrorTimer, Blizzard_RestrictedAddOnEnvironment
 
 # Forever uses its native UI controllers, not Classic FrameXML replacements.
 Libs\LibStub\LibStub.lua
@@ -36,4 +36,6 @@ Libs\AceConsole-3.0\AceConsole-3.0.xml
 
 Forever\Core.lua
 Forever\Style.lua
+Forever\Flyouts.lua
+Forever\Updates.lua
 Forever\Options.lua

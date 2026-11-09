@@ -48,7 +48,7 @@ class NativeRuntime(unittest.TestCase):
     def test_real_manifest_starts_with_current_build(self):
         lua = self.boot()
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.nativeRuntime'))
-        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.1')
+        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.2')
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.modules.Actionbar.setupCompleted'))
         self.assertIsNone(lua.eval('MainMenuBarLeftEndCap'))
         self.assertIsNone(lua.eval('MirrorTimer1'))
@@ -195,11 +195,11 @@ class NativeRuntime(unittest.TestCase):
     def test_editor_resizes_after_deferred_advanced_settings_layout(self):
         lua = self.boot()
         lua.execute("LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'):OpenLunaEditMode()")
-        self.assertEqual(lua.eval('DragonflightUIEditModeFrame.height'), 299)
+        self.assertEqual(lua.eval('DragonflightUIEditModeFrame.height'), 339)
         lua.execute('EditModeManagerFrame.AccountSettings:SetHeight(320)')
-        self.assertEqual(lua.eval('DragonflightUIEditModeFrame.height'), 574)
+        self.assertEqual(lua.eval('DragonflightUIEditModeFrame.height'), 614)
         lua.execute('EditModeManagerFrame.AccountSettings:SetHeight(45)')
-        self.assertEqual(lua.eval('DragonflightUIEditModeFrame.height'), 299)
+        self.assertEqual(lua.eval('DragonflightUIEditModeFrame.height'), 339)
 
     def test_selected_system_opens_its_luna_appearance_page(self):
         lua = self.boot()
@@ -245,7 +245,7 @@ class NativeRuntime(unittest.TestCase):
         for locale in ('enUS', 'deDE'):
             lua = self.boot(f"TEST_LOCALE = '{locale}'")
             lua.execute('DF = LibStub("AceAddon-3.0"):GetAddon("DragonflightUI"); DF:ToggleOptions()')
-            self.assertEqual(lua.eval('#DF.options.pages'), 5)
+            self.assertEqual(lua.eval('#DF.options.pages'), 6)
             lua.execute("for _, f in ipairs(frames) do if f.kind == 'Slider' then f:SetValue(f.high) end end; flushTimers()")
             self.assertEqual(lua.eval('DF.settings.hotkeySize'), 20)
             self.assertEqual(lua.eval('DF.settings.auraFontSize'), 18)
@@ -344,7 +344,8 @@ class NativeRuntime(unittest.TestCase):
         self.assertEqual(paths[0].read_bytes(), paths[1].read_bytes())
         self.assertEqual(paths[0].read_bytes(), paths[2].read_bytes())
         loaded = list(files_in_manifest(paths[0]))
-        self.assertEqual([p.name for p in loaded if p.parent.name == 'Forever'], ['Core.lua', 'Style.lua', 'Options.lua'])
+        self.assertEqual([p.name for p in loaded if p.parent.name == 'Forever'],
+                         ['Core.lua', 'Style.lua', 'Flyouts.lua', 'Updates.lua', 'Options.lua'])
         self.assertFalse(any(p.parent.name in ('Modules', 'Mixin', 'Embed') for p in loaded))
         for asset in ('uiactionbar2x.blp', 'Art/luna-logo.tga', 'Castbar/CastingBarStandard2.blp',
                       'Unitframe2x/ui-hud-unitframe-player-portraiton-2x.blp',
@@ -443,7 +444,7 @@ class NativeRuntime(unittest.TestCase):
         self.assertEqual(lua.eval("DF.windowBrowser.children[2].attributes.type"), 'click')
         self.assertFalse(lua.eval("DF.windowBrowser.children[2].attributes.useOnKeyDown"))
         self.assertTrue(lua.eval('DF.windowBrowser.children[2].attributes.clickbutton == CharacterMicroButton'))
-        self.assertIsNone(lua.eval("DF.windowBrowser.children[2]:GetScript('OnClick')"))
+        self.assertTrue(lua.eval("DF.windowBrowser.children[2]:GetScript('OnClick') == DF.windowBrowser.children[2].nativeSecureClick"))
         self.assertTrue(lua.eval('DF.windowBrowser.children[8].disabled'))
         self.assertTrue(lua.eval('DF.windowBrowser.children[12].disabled'))
 

@@ -1,10 +1,10 @@
 Run the regression checks from the `DragonflightUI` directory:
 
-Dragonflight UI Forever - Luna 1.0:
+Dragonflight UI Forever - Luna 1.2:
 
 ```text
 python -m pip install lupa
-python tests/forever_native.py
+python -m unittest discover -s tests -p "forever_*.py"
 ```
 
 These checks load the actual Forever manifest and embedded Ace libraries in Lua
@@ -18,6 +18,20 @@ callbacks, unsaved warnings, selected-system appearance pages, combat cleanup,
 restoration and native modal visibility. Artwork tests cover native refreshes
 and restoring the latest native atlas rather than a stale initial choice.
 The fixture models source frame shapes and does not emulate WoW's taint engine.
+Flyout checks execute the actual popup snippets, preserve native click handlers,
+and reject protected configuration changes in combat. They cover cursor placement
+without casting, class presets, per-character settings, bindings, mover cleanup,
+private cooldown objects/counts, and the update notice's account-wide version
+marker. The simulated secure-action dispatcher is not WoW's execution engine.
+
+Additional 1.2 client checks:
+
+- Open `/df flyouts`, configure a harmless spell or item, and open/use its flyout.
+  Test left/right opening directions, shortcuts, drag-and-drop and auto-hide.
+- Move a launcher in Luna Edit Mode and verify its saved position after reload.
+- Check first-load patchnotes, Ctrl+C copying from the Discord field, manual
+  reopening, and no repeated automatic notice on reload or another character.
+- Check combat clicks and deferred configuration, then inspect new session errors.
 Client validation still requires checking native bar clicks/paging, targeting,
 buff cancellation, casts/crafting, breathing, Esc > Edit Mode, `/editmode`, `/df`, and new
 session diagnostics. No native layouts or user profiles should be reset as part

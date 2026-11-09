@@ -42,6 +42,8 @@ local pages = {
         {'frameTint', T('Silver-violet frame accents', 'Silber-violette Rahmenakzente')},
         {'minimap', T('Style the native minimap border', 'Native Minimap-Umrandung gestalten')},
         {'windows', T('Luna frames for game windows', 'Luna-Rahmen für Spielfenster')},
+    }, actions = {
+        {T('Patchnotes & Discord', 'Patchnotes & Discord'),function() DF:ShowUpdateNotice(true) end},
     }},
     {title = T('Action bars', 'Aktionsleisten'), description = T(
         'Native action buttons keep their paging, shortcuts and combat behavior. Luna changes only their artwork and text.',
@@ -76,6 +78,13 @@ local pages = {
         'Blizzard liefert Tooltip-Inhalte und Gesundheitswerte. Für andere Tooltip-AddOns kannst du diesen Bereich ausschalten.'), controls = {
         {'tooltip', T('Adjust native tooltip scale', 'Skalierung des nativen Tooltips anpassen')},
         {'tooltipScale', T('Tooltip scale', 'Tooltip-Skalierung'), 0.75, 1.5, 0.05},
+    }},
+    {title = T('Extra flyouts','Extra-Flyouts'), description = T(
+        'Ten Classic-style extra buttons with twelve configurable slots each. Drag spells, items, mounts, toys, macros or equipment sets into the flyout editor. Move the launchers in Luna Edit Mode.',
+        'Zehn zusätzliche Knöpfe wie in Classic mit je zwölf konfigurierbaren Plätzen. Zauber, Gegenstände, Reittiere, Spielzeuge, Makros oder Ausrüstungssets in den Editor ziehen. Im Luna Edit Mode verschieben.'), controls = {
+        {'flyouts', T('Enable extra flyouts','Zusätzliche Flyouts aktivieren')},
+    }, actions = {
+        {T('Configure flyouts','Flyouts konfigurieren'),function() DF:ToggleFlyoutEditor(1) end},
     }},
 }
 
@@ -198,6 +207,11 @@ function DF:CreateOptions()
                 frame.refreshers[#frame.refreshers + 1] = refresh
                 y = y - 68
             end
+        end
+        for _, action in ipairs(data.actions or {}) do
+            local button = Button(page,action[1],270,action[2])
+            button:SetPoint('TOPLEFT',0,y)
+            y = y - 39
         end
         page:Hide()
         local tab = Button(frame, data.title, 152, function()
@@ -367,6 +381,10 @@ function DF:CreateLunaEditMode()
     close:SetPoint('TOPRIGHT', -8, -8)
     local appearance = Button(frame, T('Luna settings', 'Luna-Einstellungen'), 180, function() DF:ShowSelectedAppearance() end)
     appearance:SetPoint('TOPRIGHT', -25, -69)
+    local flyouts = Button(frame, T('Extra flyouts','Extra-Flyouts'), 200, function() DF:ToggleFlyoutEditor(1) end)
+    flyouts:SetPoint('BOTTOMLEFT',25,54)
+    local updates = Button(frame, T('Patchnotes & Discord','Patchnotes & Discord'), 225, function() DF:ShowUpdateNotice(true) end)
+    updates:SetPoint('BOTTOMRIGHT',-25,54)
     frame:SetScript('OnHide', function()
         if DF.editModeSession and not DF.restoringEditMode and EditModeManagerFrame:IsShown() then
             EditModeManagerFrame.onCloseCallback()
@@ -403,7 +421,7 @@ function DF:LayoutLunaEditMode()
     Place(manager.AccountSettings, 'TOP', 'TOP', 0, -190)
     Place(manager.RevertAllChangesButton, 'BOTTOMLEFT', 'BOTTOMLEFT', 25, 18)
     Place(manager.SaveChangesButton, 'BOTTOMRIGHT', 'BOTTOMRIGHT', -25, 18)
-    frame:SetHeight(254 + manager.AccountSettings:GetHeight())
+    frame:SetHeight(294 + manager.AccountSettings:GetHeight())
 end
 
 function DF:BeginLunaEditMode()
@@ -437,6 +455,7 @@ function DF:BeginLunaEditMode()
     self:LayoutLunaEditMode()
     self.editModeDimmer:Show()
     frame:Show()
+    self:RefreshFlyouts()
 end
 
 function DF:EndLunaEditMode()
@@ -453,6 +472,9 @@ function DF:EndLunaEditMode()
     self.editModeFrame:Hide()
     self.editModeDimmer:Hide()
     self.restoringEditMode = false
+    self:RefreshFlyoutMovers()
+    if not InCombatLockdown() then self:RefreshFlyouts() end
+    self:QueueUpdateNotice()
 end
 
 function DF:RefreshLunaEditMode()

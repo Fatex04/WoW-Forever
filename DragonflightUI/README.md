@@ -1,6 +1,6 @@
 # Dragonflight UI Forever - Luna
 
-Dragonflight UI Forever - Luna 1.1 is the dedicated WoW: Forever (Camelot) edition
+Dragonflight UI Forever - Luna 1.2 is the dedicated WoW: Forever (Camelot) edition
 of the independently maintained DragonflightUI_Luna fork of Dragonflight UI Classic.
 Its public Forever version starts at 1.0; earlier Forever engineering builds used
 the 1.4–1.7 version series. The addon folder remains `DragonflightUI` so texture
@@ -21,7 +21,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the release history.
 
 ## WoW Forever (Camelot)
 
-Version 1.1 uses a dedicated native Forever runtime under `Forever/`. The bare,
+Version 1.2 uses a dedicated native Forever runtime under `Forever/`. The bare,
 `_Forever`, and `_Camelot` manifests all target interface 16001 and load this same
 runtime. The Classic FrameXML replacements and global legacy API aliases are not
 loaded by these manifests.
@@ -52,11 +52,25 @@ snapping, advanced options, Save and Revert controls in a Luna window. Selecting
 a highlighted system keeps its native layout controls; **Luna settings** opens
 that system's appearance page. Native layout storage and unsaved-changes dialogs
 are retained, and the controls return to their original parents when the editor
-closes or Luna's editor is disabled. The Classic-only replacement aura headers,
-custom favorite flyout buttons and cast simulation are not part of the Forever
-runtime. Native game windows receive Luna frame artwork without changing their
+closes or Luna's editor is disabled. Classic replacement aura headers and cast
+simulation are not part of the Forever runtime. Native game windows receive Luna frame artwork without changing their
 content or panel callbacks. This native UI theme does not provide full feature
 parity with the Classic implementation.
+
+## Extra flyouts and update notes
+
+Version 1.2 adds ten Classic-style extra launchers with twelve slots each. Use
+`/df flyouts` or the Extra flyouts page in Luna settings. Drag spells, items,
+toys, mounts, macros or equipment sets onto a slot. Right-click a launcher to
+configure its name, icon, direction, columns, scale, shortcut and closing behavior.
+In the editor, right-click a slot to clear it; on the live flyout, use
+Alt+right-click. Shift-drag an action to pick it up. Move the launchers in Luna
+Edit Mode. Settings are per character; mage and warlock presets use known spells.
+
+The current patchnotes and selectable Discord invite appear once per account
+after each Forever update. Automatic display waits until combat and Edit Mode
+end. `/df patchnotes`, `/df discord`, Luna settings and the HUD editor reopen the
+window manually. Click the Discord field, then press Ctrl+C to copy the invite.
 
 Tests load the real Forever manifest and embedded libraries in Lua 5.1 against
 strict native frame fixtures for build 1.60.1.70790. They check startup, settings,
