@@ -204,11 +204,11 @@ class Flyouts(unittest.TestCase):
 
     def test_editor_saves_settings_and_accesses_all_ten_flyouts(self):
         lua=self.boot()
-        lua.execute("DF:HandleCommand('flyouts 3'); editor=DF.flyoutEditor; editor.name:SetText('Potions'); editor.scale:SetText('1.1'); editor.columns:SetText('3'); editor.binding:SetText('CTRL-P'); DF:SaveFlyoutEditor()")
+        lua.execute("DF:HandleCommand('flyouts 3'); editor=DF.flyoutEditor; editor.name:SetText('Potions'); editor.scale:SetValue(1.1); editor.columns:SetText('3'); editor.binding:SetText('CTRL-P'); DF:SaveFlyoutEditor()")
         self.assertEqual(lua.eval('DF.flyoutData.bars[3].name'),'Potions')
         self.assertEqual(lua.eval('DF.flyoutData.bars[3].columns'),3)
         self.assertEqual(lua.eval('DF.flyoutButtons[3].scale'),1.1)
-        lua.execute("editor.name:SetText('Still potions'); editor.directions.RIGHT:Click('LeftButton'); editor.choices[10]:Click('LeftButton')")
+        lua.execute("editor.name:SetText('Still potions'); editor.directions.RIGHT:Click('LeftButton'); DF.flyoutButtons[10].mover.scripts.OnMouseDown(DF.flyoutButtons[10].mover,'LeftButton')")
         self.assertEqual(lua.eval('DF.flyoutData.bars[3].name'),'Still potions')
         self.assertEqual(lua.eval('DF.flyoutData.bars[3].direction'),'RIGHT')
         self.assertEqual(lua.eval('editor.index'),10)
@@ -245,7 +245,63 @@ class Flyouts(unittest.TestCase):
         self.assertEqual(lua.eval('rebuilt'),0)
         self.assertEqual(lua.eval('DF.flyoutEditor.name:GetText()'),'Unsaved name')
         self.assertEqual(lua.eval('DF.flyoutEditor.action:GetText()'),'macro:Unsaved')
-        self.assertEqual(lua.eval('DF.flyoutEditor.slotButtons[1].Caption.text'),'Loaded item')
+        self.assertEqual(lua.eval('DF.flyoutEditor.selectedAction.text'),'Slot 1 · Loaded item')
+
+    def test_edit_mode_click_selects_flyout_with_contextual_settings_only(self):
+        lua=self.boot()
+        self.assertIsNone(lua.eval('DF.flyoutEditor'))
+        lua.execute('GameMenuFrame:InitButtons(); GameMenuFrame.buttons[2].callback()')
+        self.assertTrue(lua.eval('DF.editModeSession~=nil'))
+        self.assertTrue(lua.eval('DF.flyoutButtons[10].mover:IsShown()'))
+        self.assertTrue(lua.eval('DF.flyoutButtons[10]:IsShown()'))
+        lua.execute("DF.flyoutButtons[10].mover.scripts.OnMouseDown(DF.flyoutButtons[10].mover,'LeftButton')")
+        self.assertEqual(lua.eval('DF.selectedFlyout'),10)
+        self.assertEqual(lua.eval('DF.flyoutEditor.index'),10)
+        self.assertTrue(lua.eval('DF.flyoutEditor:GetParent()==DF.editModeFrame'))
+        self.assertTrue(lua.eval('DF.flyoutEditor:IsShown()'))
+        self.assertIsNone(lua.eval('DragonflightUIForeverFlyoutEditor'))
+        self.assertFalse(lua.eval('DF.flyoutEditor.enabled:GetChecked()'))
+        lua.execute('DF.flyoutEditor.enabled:SetChecked(true); DF.flyoutEditor.enabled.scripts.OnClick()')
+        self.assertTrue(lua.eval('DF.flyoutData.bars[10].enabled'))
+
+    def test_selecting_a_native_system_closes_the_flyout_settings(self):
+        lua=self.boot()
+        lua.execute("DF:HandleCommand('flyouts 2'); DF.flyoutEditor.name:SetText('Saved on selection'); EditModeManagerFrame:SelectSystem(PlayerFrame)")
+        self.assertFalse(lua.eval('DF.flyoutEditor:IsShown()'))
+        self.assertIsNone(lua.eval('DF.selectedFlyout'))
+        self.assertTrue(lua.eval('DF.editSelectedSystem==PlayerFrame'))
+        self.assertEqual(lua.eval('DF.flyoutData.bars[2].name'),'Saved on selection')
+        lua.execute("DF.flyoutButtons[3].mover.scripts.OnMouseDown(DF.flyoutButtons[3].mover,'LeftButton')")
+        self.assertEqual(lua.eval('DF.selectedFlyout'),3)
+        self.assertIsNone(lua.eval('EditModeManagerFrame.nativeSelectedSystem'))
+        lua.execute('EditModeManagerFrame:ClearSelectedSystem()')
+        self.assertFalse(lua.eval('DF.flyoutEditor:IsShown()'))
+
+    def test_position_size_changes_and_exit_apply_without_a_separate_menu(self):
+        lua=self.boot()
+        lua.execute("DF:HandleCommand('flyouts 4'); editor=DF.flyoutEditor; editor.x:SetText('123'); editor.y:SetText('321'); editor.scale:SetValue(1.25); DF:SaveFlyoutEditor()")
+        self.assertEqual(lua.eval('DF.flyoutData.bars[4].x'),123)
+        self.assertEqual(lua.eval('DF.flyoutData.bars[4].y'),321)
+        self.assertEqual(lua.eval('DF.flyoutButtons[4].scale'),1.25)
+        lua.execute('HideUIPanel(EditModeManagerFrame); flushTimers()')
+        self.assertFalse(lua.eval('editor:IsShown()'))
+        self.assertIsNone(lua.eval('DF.selectedFlyout'))
+        self.assertFalse(lua.eval('DF.flyoutButtons[10]:IsShown()'))
+        self.assertFalse(lua.eval('DF.flyoutButtons[4].mover:IsShown()'))
+
+    def test_combat_closes_selected_flyout_settings_without_changing_secure_geometry(self):
+        lua=self.boot()
+        lua.execute("DF:HandleCommand('flyouts 1'); enterCombat(true)")
+        self.assertFalse(lua.eval('DF.flyoutEditor:IsShown()'))
+        self.assertIsNone(lua.eval('DF.selectedFlyout'))
+        self.assertEqual(lua.eval('#reportedErrors'),0)
+
+    def test_disabling_flyouts_closes_contextual_settings_and_highlights(self):
+        lua=self.boot()
+        lua.execute("DF:HandleCommand('flyouts 1'); DF.settings.flyouts=false; DF:RefreshFlyouts()")
+        self.assertFalse(lua.eval('DF.flyoutEditor:IsShown()'))
+        self.assertIsNone(lua.eval('DF.selectedFlyout'))
+        self.assertFalse(lua.eval('launcher.mover:IsShown()'))
 
     def test_disabling_in_combat_finishes_cleanup_after_regen(self):
         lua=self.boot()
@@ -264,12 +320,12 @@ class UpdateNotice(unittest.TestCase):
     def test_first_login_shows_notes_once_per_forever_version(self):
         lua=self.boot()
         self.assertTrue(lua.eval('DragonflightUIForeverChangelog:IsShown()'))
-        self.assertEqual(lua.eval('DragonflightUIDB.global.lastForeverUpdateNoticeVersion'),'1.2.1')
+        self.assertEqual(lua.eval('DragonflightUIDB.global.lastForeverUpdateNoticeVersion'),'1.2.2')
         lua.execute("DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF.updateNotice:Hide(); dispatch('PLAYER_ENTERING_WORLD'); DF:QueueUpdateNotice(); flushTimers()")
         self.assertFalse(lua.eval('DF.updateNotice:IsShown()'))
 
     def test_reload_profile_and_character_changes_do_not_repeat_seen_notes(self):
-        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2.1'},profiles={Another={}}}")
+        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2.2'},profiles={Another={}}}")
         self.assertIsNone(lua.eval('DragonflightUIForeverChangelog'))
 
     def test_new_version_ignores_classic_notice_marker(self):
@@ -285,7 +341,7 @@ class UpdateNotice(unittest.TestCase):
         self.assertTrue(lua.eval('DragonflightUIForeverChangelog:IsShown()'))
 
     def test_manual_reopen_and_discord_link_remain_selectable(self):
-        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2.1'}}")
+        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2.2'}}")
         lua.execute("DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:HandleCommand('discord'); link=DF.updateNotice.DiscordLink; link:SetFocus()")
         self.assertEqual(lua.eval('link:GetText()'),'https://discord.gg/ZfYDHV6Qgs')
         self.assertTrue(lua.eval('link.highlighted'))
@@ -300,7 +356,7 @@ class UpdateNotice(unittest.TestCase):
         self.assertTrue(lua.eval('DragonflightUIForeverChangelog:IsShown()'))
 
     def test_patchnotes_can_be_opened_manually_inside_edit_mode(self):
-        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2.1'}}")
+        lua=self.boot(saved="DragonflightUIDB={global={lastForeverUpdateNoticeVersion='1.2.2'}}")
         lua.execute("DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:OpenLunaEditMode(); DF:ShowUpdateNotice(true)")
         self.assertTrue(lua.eval('DF.updateNotice:IsShown()'))
         self.assertTrue(lua.eval('EditModeManagerFrame:IsEditModeActive()'))

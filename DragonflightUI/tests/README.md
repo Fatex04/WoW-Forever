@@ -1,6 +1,6 @@
 Run the regression checks from the `DragonflightUI` directory:
 
-Dragonflight UI Forever - Luna 1.2.1:
+Dragonflight UI Forever - Luna 1.2.2:
 
 ```text
 python -m pip install lupa
@@ -27,10 +27,17 @@ Combined secure/backdrop templates model the inherited OnLoad replacement and
 missing per-frame helper methods. Injected popup initialization failure checks
 that the partial root remains hidden and display, Edit Mode and disable cleanup
 do not produce follow-up errors.
+HUD selection checks cover clicking an inactive flyout, contextual settings
+parented to the HUD editor, live size/position changes, native-system selection,
+and cleanup when leaving Edit Mode or entering combat.
+Display checks cover small-button geometry, sampling restoration, screen-pixel
+font sizing, and the one-time bottom-margin correction preserving edited anchors
+and unrelated layouts.
 
 Additional 1.2 client checks:
 
-- Open `/df flyouts`, configure a harmless spell or item, and open/use its flyout.
+- Open Esc > Edit Mode, click a highlighted flyout, configure a harmless spell
+  or item, and open/use its flyout after leaving Edit Mode.
   Test left/right opening directions, shortcuts, drag-and-drop and auto-hide.
 - Move a launcher in Luna Edit Mode and verify its saved position after reload.
 - Check first-load patchnotes, Ctrl+C copying from the Discord field, manual

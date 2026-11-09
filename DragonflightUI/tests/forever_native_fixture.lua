@@ -86,7 +86,13 @@ function Region:SetWidth(width) self.width = width end
 function Region:SetHeight(height) self.height = height end
 function Region:GetAlpha() return self.alpha end
 function Region:SetAlpha(alpha) self.alpha = alpha; self.writes = self.writes + 1 end
-function Region:SetTexture(texture) self.texture, self.atlas = texture, nil; self.writes = self.writes + 1 end
+function Region:SetTexture(texture,wrapX,wrapY,filter)
+    self.texture,self.atlas=texture,nil; self.filter=filter; self.writes=self.writes+1
+end
+function Region:IsSnappingToPixelGrid() if self.snap==nil then return true end; return self.snap end
+function Region:GetTexelSnappingBias() return self.bias or 0.5 end
+function Region:SetSnapToPixelGrid(value) self.snap=value end
+function Region:SetTexelSnappingBias(value) self.bias=value end
 function Region:GetTexture() assert(not self.privateContent, 'Read native spell icon'); return self.texture end
 function Region:SetAtlas(atlas) self.atlas = atlas end
 function Region:GetAtlas() return self.atlas end
@@ -389,6 +395,10 @@ function EditModeManagerFrame:CanEnterEditMode() return not combat end
 function EditModeManagerFrame:IsEditModeActive() return self.editModeActive == true end
 function EditModeManagerFrame:Layout() self.layouts = (self.layouts or 0) + 1 end
 function EditModeManagerFrame:SelectSystem(systemFrame) self.nativeSelectedSystem = systemFrame end
+function EditModeManagerFrame:ClearSelectedSystem()
+    self.nativeSelectedSystem=nil
+    self.nativeSelectionCleared=(self.nativeSelectionCleared or 0)+1
+end
 function EditModeManagerFrame:EnterEditMode()
     self.editModeActive = true
     EventRegistry:TriggerEvent('EditMode.Enter')
@@ -421,6 +431,7 @@ end
 
 local function nativeButton(name)
     local button = newFrame('CheckButton', name)
+    button.width,button.height=45,45
     button.icon = region('Texture'); button.icon.privateContent = true
     button.normal = region('Texture')
     button.pushed = region('Texture')

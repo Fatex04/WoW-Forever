@@ -24,6 +24,16 @@ local function Alpha(object, value, apply)
     object:SetAlpha(apply and value or alphaBases[object])
 end
 
+local function FontHeight(object, height)
+    if PixelUtil and PixelUtil.GetNearestPixelSize and object.GetEffectiveScale then
+        local scale=object:GetEffectiveScale()
+        if not DF.IsSecretValue(scale) and type(scale)=='number' and scale>0 then
+            return PixelUtil.GetNearestPixelSize(height,scale,1)
+        end
+    end
+    return height
+end
+
 local function Font(object, size, apply, relative)
     if not Allowed(object) or not object.GetFont then return end
     local base = fontBases[object]
@@ -34,7 +44,26 @@ local function Font(object, size, apply, relative)
         fontBases[object] = base
     end
     local height = apply and (relative and base[2] * size or size) or base[2]
-    object:SetFont(base[1], height, base[3])
+    object:SetFont(base[1], apply and FontHeight(object,height) or height, base[3])
+end
+
+local samplingBases={}
+local function Sampling(texture, enabled)
+    if not Allowed(texture) then return end
+    local base=samplingBases[texture]
+    if not base then
+        base={}
+        if texture.IsSnappingToPixelGrid then base.snap=texture:IsSnappingToPixelGrid() end
+        if texture.GetTexelSnappingBias then base.bias=texture:GetTexelSnappingBias() end
+        if DF.IsSecretValue(base.snap) or DF.IsSecretValue(base.bias) then return end
+        samplingBases[texture]=base
+    end
+    if texture.SetSnapToPixelGrid and base.snap~=nil then
+        local snap=base.snap
+        if enabled then snap=false end
+        texture:SetSnapToPixelGrid(snap)
+    end
+    if texture.SetTexelSnappingBias and base.bias~=nil then texture:SetTexelSnappingBias(enabled and 0 or base.bias) end
 end
 
 local function Tint(object, apply)
@@ -65,7 +94,7 @@ local function Texture(texture, path, apply, coords)
         textureBases[texture] = base
     end
     if apply then
-        texture:SetTexture(path)
+        texture:SetTexture(path,nil,nil,'LINEAR')
         texture:SetTexCoord(unpack(coords or {0, 1, 0, 1}))
     else
         if base.atlas and base.atlas ~= '' then
@@ -75,6 +104,7 @@ local function Texture(texture, path, apply, coords)
         end
         texture:SetTexCoord(unpack(base.coords))
     end
+    Sampling(texture,apply)
 end
 
 local geometryBases = {}
@@ -113,6 +143,7 @@ local function Edge(owner, icon, enabled, inset)
     end
     if edge then
         edge:SetShown(enabled)
+        Sampling(edge,enabled)
         Tint(edge, DF.settings.frameTint)
     end
 end
@@ -140,23 +171,27 @@ function DF:StyleActionButton(button, enabled)
     local normal = button.GetNormalTexture and button:GetNormalTexture()
     local pushed = button.GetPushedTexture and button:GetPushedTexture()
     local borders = enabled and settings.actionbarBorders
+    local width,height=button:GetWidth(),button:GetHeight()
+    if self.IsSecretValue(width) or type(width)~='number' or width<=0 then width=45 end
+    if self.IsSecretValue(height) or type(height)~='number' or height<=0 then height=45 end
+    local borderWidth=width*46/45
     Edge(button, icon, borders and not normal, 1)
     Texture(normal, textureBase .. 'uiactionbar2x', borders,
         {0.701171875, 0.880859375, 0.31689453125, 0.36083984375})
     Texture(pushed, textureBase .. 'uiactionbar2x', borders,
         {0.701171875, 0.880859375, 0.43017578125, 0.47412109375})
-    Geometry(normal, button, 46, 45, 'TOPLEFT', 0, 0, borders)
-    Geometry(pushed, button, 46, 45, 'TOPLEFT', 0, 0, borders)
-    Geometry(icon, button, 45, 45, 'CENTER', 0, 0, borders)
+    Geometry(normal, button, borderWidth, height, 'TOPLEFT', 0, 0, borders)
+    Geometry(pushed, button, borderWidth, height, 'TOPLEFT', 0, 0, borders)
+    Geometry(icon, button, width, height, 'CENTER', 0, 0, borders)
     Texture(button.IconMask, textureBase .. 'maskNew', borders)
-    if button.IconMask then Geometry(button.IconMask, button, 45, 45, 'CENTER', 0, 0, borders) end
+    if button.IconMask then Geometry(button.IconMask, button, width, height, 'CENTER', 0, 0, borders) end
     for _, pair in ipairs({
         {button.Border, {0.701171875,0.880859375,0.36181640625,0.40576171875}},
         {button.GetHighlightTexture and button:GetHighlightTexture(), {0.701171875,0.880859375,0.52001953125,0.56396484375}},
         {button.GetCheckedTexture and button:GetCheckedTexture(), {0.701171875,0.880859375,0.52001953125,0.56396484375}},
     }) do
         Texture(pair[1], textureBase .. 'uiactionbar2x', borders, pair[2])
-        Geometry(pair[1], button, 46, 45, 'TOPLEFT', 0, 0, borders)
+        Geometry(pair[1], button, borderWidth, height, 'TOPLEFT', 0, 0, borders)
     end
     Alpha(button.SlotArt, 0, borders)
     Alpha(button.SlotBackground, 0, borders)
@@ -171,6 +206,9 @@ function DF:StyleActionButton(button, enabled)
             -- Record that native choice before applying Luna's artwork.
             ForgetNativeArt(button:GetNormalTexture())
             ForgetNativeArt(button.GetPushedTexture and button:GetPushedTexture())
+            local currentIcon=button.icon or button.Icon
+            if currentIcon then geometryBases[currentIcon]=nil end
+            if button.IconMask then geometryBases[button.IconMask]=nil end
             self:StyleActionButton(button, self.active and self.settings.enabled and self.settings.actionbars)
         end)
     end
@@ -300,6 +338,50 @@ local function SetLayoutSetting(system, setting, value)
     end
 end
 
+-- Raise only the untouched anchors created by the first Luna preset. The
+-- comparison includes both axes, so a player's edited position is preserved.
+local function BottomAnchors()
+    return {
+        {MainActionBar,0,8},{MultiBarBottomLeft,0,56},{MultiBarBottomRight,0,104},
+        {MultiBarRight,-390,8},{MultiBarLeft,390,8},
+        {StatusTrackingBarManager and StatusTrackingBarManager.MainStatusTrackingBarContainer,0,156},
+        {StatusTrackingBarManager and StatusTrackingBarManager.SecondaryStatusTrackingBarContainer,0,169},
+    }
+end
+
+function DF:UpdateClassicBottomClearance(manager, marker)
+    if type(marker)~='table' or (type(marker.version)=='number' and marker.version>=2) then return end
+    local current=manager.layoutInfo.layouts[manager.layoutInfo.activeLayout]
+    if not current or current.layoutName~='Luna Classic' or current.layoutType~=Enum.EditModeLayoutType.Character then return end
+    local info=CopyTable(manager.layoutInfo)
+    local layout=info.layouts[info.activeLayout]
+    local changed=false
+    for _,row in ipairs(BottomAnchors()) do
+        local frame=row[1]
+        if frame and frame.system then
+            for _,system in ipairs(layout.systems or {}) do
+                local anchor=system.anchorInfo
+                if system.system==frame.system and system.systemIndex==frame.systemIndex and anchor and
+                    anchor.point=='BOTTOM' and anchor.relativePoint=='BOTTOM' and anchor.relativeTo=='UIParent' and
+                    anchor.offsetX==row[2] and anchor.offsetY==row[3] then
+                    anchor.offsetY=anchor.offsetY+16
+                    changed=true
+                end
+            end
+        end
+    end
+    if changed then
+        self.applyingReference=true
+        local ok,message=pcall(function()
+            C_EditMode.SaveLayouts(info)
+            C_EditMode.SetActiveLayout(info.activeLayout)
+        end)
+        self.applyingReference=false
+        if not ok then error(message) end
+    end
+    marker.version=2
+end
+
 function DF:ApplyClassicReferenceLayout(force)
     local manager = EditModeManagerFrame
     if not self.active or not self.settings.enabled or self.applyingReference or InCombatLockdown() or not manager or not manager.layoutInfo or
@@ -308,27 +390,27 @@ function DF:ApplyClassicReferenceLayout(force)
     if self.IsSecretValue(key) or not key then return end
     DragonflightUIDB.foreverLayouts = DragonflightUIDB.foreverLayouts or {}
     local saved = DragonflightUIDB.foreverLayouts
-    if saved[key] and not force then return end
+    if saved[key] and not force then self:UpdateClassicBottomClearance(manager,saved[key]); return end
     local source = manager.layoutInfo.layouts[manager.layoutInfo.activeLayout]
     if not source then return end
     local layout = CopyTable(source)
     local actions, units = Enum.EditModeActionBarSetting, Enum.EditModeUnitFrameSetting
     local width, height = UIParent:GetWidth(), UIParent:GetHeight()
     local frames = {
-        {MainActionBar, 'BOTTOM', 'BOTTOM', 0, 8, actions, {NumRows=1,NumIcons=12,IconSize=100,IconPadding=2,HideBarArt=1,HideBarScrolling=1,AlwaysShowButtons=1}},
-        {MultiBarBottomLeft, 'BOTTOM', 'BOTTOM', 0, 56, actions, {NumRows=1,NumIcons=12,IconSize=100,IconPadding=2,AlwaysShowButtons=1}},
-        {MultiBarBottomRight, 'BOTTOM', 'BOTTOM', 0, 104, actions, {NumRows=1,NumIcons=12,IconSize=100,IconPadding=2,AlwaysShowButtons=1}},
-        {MultiBarRight, 'BOTTOM', 'BOTTOM', -390, 8, actions, {NumRows=3,NumIcons=12,IconSize=100,IconPadding=2,AlwaysShowButtons=1}},
-        {MultiBarLeft, 'BOTTOM', 'BOTTOM', 390, 8, actions, {NumRows=3,NumIcons=12,IconSize=100,IconPadding=2,AlwaysShowButtons=1}},
+        {MainActionBar, 'BOTTOM', 'BOTTOM', 0, 24, actions, {NumRows=1,NumIcons=12,IconSize=100,IconPadding=2,HideBarArt=1,HideBarScrolling=1,AlwaysShowButtons=1}},
+        {MultiBarBottomLeft, 'BOTTOM', 'BOTTOM', 0, 72, actions, {NumRows=1,NumIcons=12,IconSize=100,IconPadding=2,AlwaysShowButtons=1}},
+        {MultiBarBottomRight, 'BOTTOM', 'BOTTOM', 0, 120, actions, {NumRows=1,NumIcons=12,IconSize=100,IconPadding=2,AlwaysShowButtons=1}},
+        {MultiBarRight, 'BOTTOM', 'BOTTOM', -390, 24, actions, {NumRows=3,NumIcons=12,IconSize=100,IconPadding=2,AlwaysShowButtons=1}},
+        {MultiBarLeft, 'BOTTOM', 'BOTTOM', 390, 24, actions, {NumRows=3,NumIcons=12,IconSize=100,IconPadding=2,AlwaysShowButtons=1}},
         {PlayerFrame, 'CENTER', 'CENTER', -width * 0.14, -height * 0.18, units, {FrameSize=125,HidePortrait=0}},
         {TargetFrame, 'CENTER', 'CENTER', width * 0.14, -height * 0.18, units, {FrameSize=125,HidePortrait=0}},
         {FocusFrame, 'CENTER', 'CENTER', width * 0.14, -height * 0.04, units, {FrameSize=100,HidePortrait=0}},
         {MinimapCluster, 'TOPRIGHT', 'TOPRIGHT', -4, -4, Enum.EditModeMinimapSetting, {Size=100,RotateMinimap=0,HeaderUnderneath=0}},
         {MicroMenuContainer, 'BOTTOMRIGHT', 'BOTTOMRIGHT', -4, 0, Enum.EditModeMicroMenuSetting, {Orientation=0,Size=100}},
         {BagsBar, 'BOTTOMRIGHT', 'BOTTOMRIGHT', -8, 43, Enum.EditModeBagsSetting, {Orientation=0,Size=100,BagSlotPadding=2}},
-        {StatusTrackingBarManager and StatusTrackingBarManager.MainStatusTrackingBarContainer, 'BOTTOM', 'BOTTOM', 0, 156,
+        {StatusTrackingBarManager and StatusTrackingBarManager.MainStatusTrackingBarContainer, 'BOTTOM', 'BOTTOM', 0, 172,
             Enum.EditModeStatusTrackingBarSetting, {Size=50}},
-        {StatusTrackingBarManager and StatusTrackingBarManager.SecondaryStatusTrackingBarContainer, 'BOTTOM', 'BOTTOM', 0, 169,
+        {StatusTrackingBarManager and StatusTrackingBarManager.SecondaryStatusTrackingBarContainer, 'BOTTOM', 'BOTTOM', 0, 185,
             Enum.EditModeStatusTrackingBarSetting, {Size=50}},
     }
     for _, row in ipairs(frames) do
@@ -374,7 +456,7 @@ function DF:ApplyClassicReferenceLayout(force)
     end)
     self.applyingReference = false
     if not ok then error(message); return end
-    saved[key] = {previousLayout = source.layoutName, version = 1}
+    saved[key] = {previousLayout = source.layoutName, version = 2}
     for number = 1, 4 do C_CVar.SetCVar('showMultiActionBar' .. number, '1') end
     self.settings.frameTint = false
 end
@@ -393,6 +475,7 @@ function DF:StyleLunaMinimap(enabled)
     local width = Minimap:GetWidth()
     minimapSkin.border:SetSize(width * 156 / 140, width * 162 / 140)
     minimapSkin.border:SetShown(enabled)
+    Sampling(minimapSkin.border,enabled)
     Alpha(MinimapCompassTexture, 0, enabled)
     Alpha(MinimapCompassTextureUnderlay, 0, enabled)
     Alpha(MinimapNorthTag, 0, enabled)
@@ -597,9 +680,9 @@ end
 
 local function NewLabel(parent, size)
     local text = parent:CreateFontString(nil, 'OVERLAY')
-    text:SetFont(STANDARD_TEXT_FONT, size, 'OUTLINE')
+    text:SetFont(STANDARD_TEXT_FONT, FontHeight(text,size), 'OUTLINE')
     text:SetShadowColor(0, 0, 0, 1)
-    text:SetShadowOffset(1, -1)
+    text:SetShadowOffset(0, 0)
     text:SetWordWrap(false)
     return text
 end
@@ -610,9 +693,11 @@ local function NewBar(parent, width, height, kind, resource, maskFile, maskW, ma
     bar:EnableMouse(false)
     local textureKind = kind == 'TargetofTarget' and 'Target' or kind
     bar:SetStatusBarTexture(textureBase .. 'Unitframe\\UI-HUD-UnitFrame-' .. textureKind .. '-PortraitOn-Bar-' .. resource)
+    Sampling(bar:GetStatusBarTexture(),true)
     bar:SetStatusBarColor(1, 1, 1, 1)
     local mask = bar:CreateMaskTexture(nil, 'ARTWORK')
     mask:SetTexture(textureBase .. 'Unitframe2x\\' .. maskFile, 'CLAMPTOBLACKADDITIVE', 'CLAMPTOBLACKADDITIVE')
+    Sampling(mask,true)
     mask:SetSize(maskW, maskH)
     mask:SetPoint('TOPLEFT', bar, 'TOPLEFT', maskX, maskY)
     bar:GetStatusBarTexture():AddMaskTexture(mask)
@@ -638,15 +723,18 @@ local function CreateUnitVisual(name, root)
     unitVisuals[name] = hud
     frame.Art = frame:CreateTexture(nil, 'BORDER')
     frame.Art:SetTexture(textureBase .. 'Unitframe2x\\' .. data[1])
+    Sampling(frame.Art,true)
     frame.Art:SetTexCoord(0, data[4], 0, data[5])
     frame.Art:SetAllPoints(frame)
     frame.Art:SetDesaturated(true)
     frame.Art:SetVertexColor(0.42, 0.45, 0.50, 1)
     frame.Portrait = frame:CreateTexture(nil, 'BACKGROUND')
+    Sampling(frame.Portrait,true)
     local portraitMask = frame:CreateMaskTexture(nil, 'ARTWORK')
     portraitMask:SetAllPoints(frame.Portrait)
     portraitMask:SetTexture(textureBase .. (kind == 'Player' and 'uiunitframeplayerportraitmask' or 'tempportraitalphamask'),
         'CLAMPTOBLACKADDITIVE', 'CLAMPTOBLACKADDITIVE')
+    Sampling(portraitMask,true)
     frame.Portrait:AddMaskTexture(portraitMask)
     frame.Name = NewLabel(frame, 12)
     frame.Name:SetTextColor(1, 0.82, 0)
@@ -807,7 +895,7 @@ function DF:StyleUnitFrames(enabled)
                 Tint(hud.frame.Art, show and self.settings.frameTint)
                 local size = (hud.kind == 'TargetofTarget' and 9 or 12) * self.settings.unitFontScale
                 for _, text in ipairs({hud.frame.Name, hud.frame.Level, hud.frame.Health.ValueText, hud.frame.Power.ValueText}) do
-                    text:SetFont(STANDARD_TEXT_FONT, size, 'OUTLINE')
+                    text:SetFont(STANDARD_TEXT_FONT, FontHeight(text,size), 'OUTLINE')
                 end
                 SyncUnitVisual(hud)
                 HookVisualSource(health)

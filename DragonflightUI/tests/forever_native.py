@@ -52,7 +52,7 @@ class NativeRuntime(unittest.TestCase):
     def test_real_manifest_starts_with_current_build(self):
         lua = self.boot()
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.nativeRuntime'))
-        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.2.1')
+        self.assertEqual(lua.eval('DragonflightUIDB.global.foreverDiagnostics.version'), '1.2.2')
         self.assertTrue(lua.eval('DragonflightUIDB.global.foreverDiagnostics.modules.Actionbar.setupCompleted'))
         self.assertIsNone(lua.eval('MainMenuBarLeftEndCap'))
         self.assertIsNone(lua.eval('MirrorTimer1'))
@@ -296,6 +296,42 @@ class NativeRuntime(unittest.TestCase):
         self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal.atlas'), 'updated-native-normal')
         self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal.width'), 51)
 
+    def test_small_button_art_fits_its_native_bounds(self):
+        lua=self.boot()
+        lua.execute("""
+            button=StanceBar.actionButtons[1]; button.width=30.9; button.height=30.9
+            button.icon:SetSize(30.9,30.9); button:UpdateButtonArt()
+        """)
+        self.assertAlmostEqual(lua.eval('button.icon.width'),30.9)
+        self.assertAlmostEqual(lua.eval('button.normal.width'),30.9*46/45)
+        self.assertEqual(lua.eval('button.width'),30.9)
+        lua.execute("DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:StyleActionButton(button,false)")
+        self.assertEqual(lua.eval('button.normal.width'),51)
+        self.assertEqual(lua.eval('button.icon.width'),30.9)
+
+    def test_luna_sampling_is_smooth_and_native_sampling_restores(self):
+        lua=self.boot()
+        self.assertFalse(lua.eval('MainActionBar.actionButtons[1].normal:IsSnappingToPixelGrid()'))
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal:GetTexelSnappingBias()'),0)
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal.filter'),'LINEAR')
+        lua.execute("DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF.settings.enabled=false; DF:ApplyTheme()")
+        self.assertTrue(lua.eval('MainActionBar.actionButtons[1].normal:IsSnappingToPixelGrid()'))
+        self.assertEqual(lua.eval('MainActionBar.actionButtons[1].normal:GetTexelSnappingBias()'),0.5)
+
+    def test_unit_font_uses_whole_screen_pixels_without_a_second_shadow(self):
+        lua=self.boot()
+        lua.execute("""
+            PixelUtil={GetNearestPixelSize=function(size,scale)
+                local factor=768/1440
+                return math.floor(size*scale/factor+0.5)*factor/scale
+            end}
+            text=DragonflightUILunaPlayerFrame.Health.ValueText
+            text.GetEffectiveScale=function() return 0.85 end
+            DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI'); DF:StyleUnitFrames(true)
+        """)
+        self.assertAlmostEqual(lua.eval('text.font[2]*0.85/(768/1440)'),19)
+        self.assertEqual(list(lua.eval('text.shadowOffset').values()),[0,0])
+
     def test_native_unit_art_updates_keep_luna_frames_without_secure_geometry_changes(self):
         lua = self.boot()
         lua.execute('combat = true; PlayerFrame_UpdateArt(); TargetFrame:CheckClassification()')
@@ -432,8 +468,56 @@ class NativeRuntime(unittest.TestCase):
         self.assertEqual(lua.eval('savedLayouts.layouts[2].layoutName'), 'Luna Classic')
         self.assertEqual(lua.eval('savedLayouts.layouts[2].systems[1].settings[1].value'), 0)
         self.assertEqual(lua.eval('savedLayouts.layouts[2].systems[1].settings[4].value'), 5)
+        self.assertEqual(lua.eval('savedLayouts.layouts[2].systems[1].anchorInfo.offsetY'),24)
         self.assertEqual(lua.eval('activeLayout'), 2)
         self.assertEqual(lua.eval("DragonflightUIDB.foreverLayouts['fixture-character'].previousLayout"), 'My layout')
+
+    def bottom_clearance_runtime(self):
+        lua=self.boot()
+        lua.execute("""
+            function CopyTable(source)
+                local copy={}; for key,value in pairs(source) do
+                    copy[key]=type(value)=='table' and CopyTable(value) or value
+                end; return copy
+            end
+            UnitGUID=function() return 'fixture-character' end
+            Enum=Enum or {}; Enum.EditModeLayoutType={Character=2}
+            EditModeSettingDisplayInfoManager={displayInfoMap={}}
+            MainActionBar.system=0; MainActionBar.systemIndex=0
+            MultiBarBottomLeft.system=0; MultiBarBottomLeft.systemIndex=1
+            local function System(index,x,y)
+                return {system=0,systemIndex=index,settings={{setting=3,value=5}},
+                    anchorInfo={point='BOTTOM',relativePoint='BOTTOM',relativeTo='UIParent',offsetX=x,offsetY=y}}
+            end
+            EditModeManagerFrame.layoutInfo={activeLayout=1,layouts={
+                {layoutName='Luna Classic',layoutType=2,systems={System(0,0,8),System(1,17,56)}},
+                {layoutName='My other layout',layoutType=2,systems={System(0,123,42)}}}}
+            originalLayouts=EditModeManagerFrame.layoutInfo
+            DragonflightUIDB.foreverLayouts={['fixture-character']={version=1,previousLayout='My original layout'}}
+            C_EditMode.SaveLayouts=function(info) savedLayouts=info; saves=(saves or 0)+1; EditModeManagerFrame.layoutInfo=info end
+            C_EditMode.SetActiveLayout=function(index) activeLayout=index end
+            DF=LibStub('AceAddon-3.0'):GetAddon('DragonflightUI')
+        """)
+        return lua
+
+    def test_bottom_clearance_migrates_untouched_preset_anchors_only_once(self):
+        lua=self.bottom_clearance_runtime()
+        lua.execute('DF:ApplyClassicReferenceLayout(); DF:ApplyClassicReferenceLayout()')
+        self.assertEqual(lua.eval('saves'),1)
+        self.assertEqual(lua.eval('savedLayouts.layouts[1].systems[1].anchorInfo.offsetY'),24)
+        self.assertEqual(lua.eval('originalLayouts.layouts[1].systems[1].anchorInfo.offsetY'),8)
+        self.assertEqual(lua.eval('savedLayouts.layouts[1].systems[2].anchorInfo.offsetX'),17)
+        self.assertEqual(lua.eval('savedLayouts.layouts[1].systems[2].anchorInfo.offsetY'),56)
+        self.assertEqual(lua.eval('savedLayouts.layouts[2].systems[1].anchorInfo.offsetY'),42)
+        self.assertEqual(lua.eval('savedLayouts.layouts[1].systems[1].settings[1].value'),5)
+        self.assertEqual(lua.eval("DragonflightUIDB.foreverLayouts['fixture-character'].version"),2)
+
+    def test_bottom_clearance_does_not_reposition_a_custom_layout(self):
+        lua=self.bottom_clearance_runtime()
+        lua.execute("EditModeManagerFrame.layoutInfo.layouts[1].layoutName='My custom layout'; DF:ApplyClassicReferenceLayout()")
+        self.assertIsNone(lua.eval('saves'))
+        self.assertEqual(lua.eval('EditModeManagerFrame.layoutInfo.layouts[1].systems[1].anchorInfo.offsetY'),8)
+        self.assertEqual(lua.eval("DragonflightUIDB.foreverLayouts['fixture-character'].version"),1)
 
     def test_window_browser_uses_secure_click_actions_and_disables_missing_client_features(self):
         lua = self.boot()

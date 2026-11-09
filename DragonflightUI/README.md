@@ -1,6 +1,6 @@
 # Dragonflight UI Forever - Luna
 
-Dragonflight UI Forever - Luna 1.2.1 is the dedicated WoW: Forever (Camelot) edition
+Dragonflight UI Forever - Luna 1.2.2 is the dedicated WoW: Forever (Camelot) edition
 of the independently maintained DragonflightUI_Luna fork of Dragonflight UI Classic.
 Its public Forever version starts at 1.0; earlier Forever engineering builds used
 the 1.4–1.7 version series. The addon folder remains `DragonflightUI` so texture
@@ -21,7 +21,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the release history.
 
 ## WoW Forever (Camelot)
 
-Version 1.2.1 uses a dedicated native Forever runtime under `Forever/`. The bare,
+Version 1.2.2 uses a dedicated native Forever runtime under `Forever/`. The bare,
 `_Forever`, and `_Camelot` manifests all target interface 16001 and load this same
 runtime. The Classic FrameXML replacements and global legacy API aliases are not
 loaded by these manifests.
@@ -59,13 +59,16 @@ parity with the Classic implementation.
 
 ## Extra flyouts and update notes
 
-Version 1.2 adds ten Classic-style extra launchers with twelve slots each. Use
-`/df flyouts` or the Extra flyouts page in Luna settings. Drag spells, items,
-toys, mounts, macros or equipment sets onto a slot. Right-click a launcher to
-configure its name, icon, direction, columns, scale, shortcut and closing behavior.
-In the editor, right-click a slot to clear it; on the live flyout, use
-Alt+right-click. Shift-drag an action to pick it up. Move the launchers in Luna
-Edit Mode. Settings are per character; mage and warlock presets use known spells.
+Version 1.2 adds ten Classic-style extra launchers with twelve slots each.
+In 1.2.2, open **Esc > Edit Mode** and click a highlighted flyout directly. Its
+attached settings pane controls name, icon, direction, columns, size, position,
+shortcut, closing behavior and action slots. Drag the highlight to move it.
+Disabled launchers are shown in Edit Mode so they can be selected and enabled.
+`/df flyouts` and right-clicking a launcher enter this same HUD selection flow.
+Drag spells, items, toys, mounts, macros or equipment sets onto a slot. In the
+settings pane, right-click a slot to clear it; on the live flyout, use
+Alt+right-click. Shift-drag an action to pick it up. Changes save automatically
+per character; mage and warlock presets use known spells.
 
 The current patchnotes and selectable Discord invite appear once per account
 after each Forever update. Automatic display waits until combat and Edit Mode

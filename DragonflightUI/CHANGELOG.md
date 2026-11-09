@@ -1,7 +1,29 @@
 # DragonflightUI_Luna Changelog
 
+## Dragonflight UI Forever - Luna 1.2.2 - 9 November 2026
+
+- Action-button artwork now follows each button's native dimensions. Small
+  stance/pet/flyout buttons are no longer stretched to a fixed 45-pixel size.
+- Luna artwork uses linear filtering without texel snapping. Native sampling
+  settings are restored when the skin is disabled. Native spell/item artwork
+  and the user's global UI/render scale remain under the client's control.
+- Luna unit labels use whole screen-pixel font sizes and a single outline,
+  removing the extra scaled shadow. Scale/display changes refresh the styling.
+- Raised the preset's bottom action-bar rows and progress bars by 16 UI units.
+  Existing version-1 Luna layouts migrate only anchors that exactly match the
+  original preset on both axes. Customized positions and other layouts remain
+  intact, and the correction runs once per character.
+- Includes the direct Edit Mode flyout selection and startup fixes below.
+
 ## Dragonflight UI Forever - Luna 1.2.1 - 9 November 2026
 
+- Replaced the standalone flyout menu with direct HUD Edit Mode selection.
+  Open Esc > Edit Mode, click a highlighted flyout and customize its size,
+  direction, position, shortcut and action slots in the attached settings pane.
+  Drag the highlight to move it. Disabled flyouts are shown for selection and
+  activation. Selecting a native system or leaving Edit Mode closes the pane.
+- `/df flyouts` and launcher configuration shortcuts now enter the same HUD
+  selection flow. Flyout changes are saved automatically per character.
 - Fixed flyout startup failing with a missing `SetFrameRef` method. The combined
   backdrop/secure template replaces the inherited OnLoad initializer; flyouts
   now use native `SecureHandlerSetFrameRef` and `SecureHandlerWrapScript`

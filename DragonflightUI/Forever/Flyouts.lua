@@ -341,13 +341,15 @@ function DF:CreateFlyoutFrames()
         mover:SetBackdrop({bgFile='Interface\\Buttons\\WHITE8X8',edgeFile='Interface\\Buttons\\WHITE8X8',edgeSize=1})
         mover:SetBackdropColor(0.65,0.8,1,0.35); mover:SetBackdropBorderColor(1,1,1,1)
         mover:EnableMouse(true); mover:RegisterForDrag('LeftButton'); mover:Hide()
-        mover:SetScript('OnDragStart',function() if not InCombatLockdown() then launcher:StartMoving() end end)
+        mover:SetScript('OnMouseDown',function(_,button)
+            if button=='LeftButton' or button=='RightButton' then DF:SelectFlyoutInEditMode(index) end
+        end)
+        mover:SetScript('OnDragStart',function()
+            if not InCombatLockdown() then DF:SelectFlyoutInEditMode(index); launcher:StartMoving() end
+        end)
         mover:SetScript('OnDragStop',function()
             if InCombatLockdown() then launcher.pendingStop=true; DF.pendingFlyouts=true; return end
             DF:SaveFlyoutPosition(launcher)
-        end)
-        mover:SetScript('OnMouseUp',function(_,button)
-            if button=='RightButton' then DF:ToggleFlyoutEditor(index) end
         end)
     end
     self.flyoutFramesReady=true
@@ -360,6 +362,9 @@ function DF:SaveFlyoutPosition(launcher)
     local point,_,relativePoint,x,y=launcher:GetPoint(1)
     local bar=self.flyoutData.bars[launcher.index]
     bar.point,bar.relativePoint,bar.x,bar.y=point,relativePoint,x,y
+    if self.flyoutEditor and self.flyoutEditor.index==launcher.index then
+        self.flyoutEditor.x:SetText(tostring(x)); self.flyoutEditor.y:SetText(tostring(y))
+    end
 end
 
 function DF:FlyoutActionTooltip(button,action)
@@ -418,6 +423,7 @@ function DF:RefreshFlyouts()
     self.pendingFlyouts=false
     if not self.active or not self.settings.enabled or not self.settings.flyouts then
         self.moduleStatus.Flyouts={enabled=false,setupCompleted=self.flyoutFramesReady==true,native=false}
+        if self.flyoutEditor and self.flyoutEditor:IsShown() then self:ClearFlyoutSelection(true) end
         if self.flyoutRoot then
             if ClearOverrideBindings then ClearOverrideBindings(self.flyoutRoot) end
             self.flyoutRoot:Hide()
@@ -442,10 +448,11 @@ function DF:RefreshFlyouts()
         if launcher.pendingStop then self:SaveFlyoutPosition(launcher) end
         launcher.popup:Hide()
         launcher:ClearAllPoints(); launcher:SetPoint(bar.point,UIParent,bar.relativePoint,bar.x,bar.y)
-        launcher:SetScale(bar.scale); launcher:SetShown(bar.enabled)
-        launcher.Label:SetText(bar.name); launcher.HotKey:SetText(bar.binding)
+        launcher:SetScale(bar.scale); launcher:SetShown(bar.enabled or editing)
+        launcher.Label:SetText(bar.name .. (editing and not bar.enabled and T(' (off)',' (aus)') or ''))
+        launcher.HotKey:SetText(bar.binding)
         launcher.icon:SetTexture(bar.icon)
-        launcher.mover:SetShown(editing and bar.enabled)
+        launcher.icon:SetAlpha(editing and not bar.enabled and 0.35 or 1)
         local rotations={UP=0,RIGHT=-math.pi/2,DOWN=math.pi,LEFT=math.pi/2}
         launcher.Arrow:SetRotation(rotations[bar.direction])
         local horizontal=bar.direction=='LEFT' or bar.direction=='RIGHT'
@@ -479,6 +486,7 @@ function DF:RefreshFlyouts()
             end
         end
     end
+    self:RefreshFlyoutMovers()
     self.moduleStatus.Flyouts={enabled=true,setupCompleted=true,buttons=COUNT,native=false}
 end
 
@@ -487,134 +495,170 @@ function DF:RefreshFlyoutMovers()
         if launcher.mover then
             local bar=self.flyoutData and self.flyoutData.bars[launcher.index]
             launcher.mover:SetShown(self.flyoutFramesReady and self.active and self.settings.enabled and self.settings.flyouts and
-                self.editModeSession~=nil and not InCombatLockdown() and bar and bar.enabled or false)
+                self.editModeSession~=nil and not InCombatLockdown() and bar~=nil or false)
+            local selected=self.selectedFlyout==launcher.index
+            launcher.mover:SetBackdropColor(selected and 0.9 or 0.3,selected and 0.7 or 0.65,selected and 0.1 or 0.95,0.3)
+            launcher.mover:SetBackdropBorderColor(selected and 1 or 0.45,selected and 0.82 or 0.8,selected and 0.2 or 1,1)
         end
     end
 end
 
-function DF:ToggleFlyoutEditor(index)
-    if InCombatLockdown() then self:Print(T('Configure flyouts outside combat.','Flyouts außerhalb des Kampfes konfigurieren.')); return end
-    if not self:InitializeFlyouts() then return end
-    if self.flyoutEditor then
-        self:SaveFlyoutEditor(true)
-        if index then self.flyoutEditor.index=math.floor(Number(index,1,COUNT,1)); self.flyoutEditor:Show(); self:RefreshFlyoutEditor()
-        else self.flyoutEditor:SetShown(not self.flyoutEditor:IsShown()) end
-        return
+function DF:ClearFlyoutSelection(skipSave)
+    local frame=self.flyoutEditor
+    if frame and frame:IsShown() then
+        if not skipSave then self:SaveFlyoutEditor(true) end
+        frame.refreshing=true; frame:Hide(); frame.refreshing=false
     end
-    local frame=CreateFrame('Frame','DragonflightUIForeverFlyoutEditor',UIParent,'BackdropTemplate')
+    self.selectedFlyout=nil
+    self:RefreshFlyoutMovers()
+end
+
+function DF:SelectFlyoutInEditMode(index)
+    if InCombatLockdown() then self:Print(T('Configure flyouts outside combat.','Flyouts außerhalb des Kampfes konfigurieren.')); return end
+    if not self.active or not self.settings.enabled or not self.settings.flyouts or not self:InitializeFlyouts() then return end
+    if not self.editModeSession then self:OpenLunaEditMode() end
+    if not self.editModeSession or not self.flyoutFramesReady then return end
+    index=math.floor(Number(index,1,COUNT,1))
+    if self.selectedFlyout==index and self.flyoutEditor and self.flyoutEditor:IsShown() then return end
+    if EditModeManagerFrame.ClearSelectedSystem then EditModeManagerFrame:ClearSelectedSystem()
+    else self:ClearFlyoutSelection() end
+    local frame=self:CreateFlyoutSelectionSettings()
+    frame.index=index; frame.selectedSlot=1
+    self.selectedFlyout=frame.index; self.editSelectedSystem=nil
+    self:RefreshFlyoutEditor(); frame:Show(); self:RefreshFlyoutMovers()
+end
+
+-- Keep earlier slash commands and integrations, but route them into HUD editing.
+function DF:ToggleFlyoutEditor(index)
+    self:SelectFlyoutInEditMode(index or self.selectedFlyout or 1)
+end
+
+function DF:CreateFlyoutSelectionSettings()
+    if self.flyoutEditor then return self.flyoutEditor end
+    local frame=CreateFrame('Frame','DragonflightUIForeverFlyoutSettings',self.editModeFrame,'BackdropTemplate')
     self.flyoutEditor=frame
-    frame.index=math.floor(Number(index,1,COUNT,1)); frame.selectedSlot=1
-    frame:SetSize(760,610); frame:SetPoint('CENTER')
-    frame:SetScale(math.min(1,math.max(0.5,(UIParent:GetHeight()-40)/610)))
-    frame:SetFrameStrata('DIALOG'); frame:SetFrameLevel(350); frame:SetClampedToScreen(true); frame:EnableMouse(true)
-    frame:SetMovable(true); frame:RegisterForDrag('LeftButton')
-    frame:SetScript('OnDragStart',frame.StartMoving); frame:SetScript('OnDragStop',frame.StopMovingOrSizing)
+    frame.index=1; frame.selectedSlot=1
+    frame:SetSize(380,700)
+    frame:SetPoint('TOPRIGHT',self.editModeFrame,'TOPLEFT',-12,0)
+    frame:SetScale(math.min(1,math.max(0.5,(UIParent:GetHeight()-50)/700)))
+    frame:SetFrameStrata('DIALOG'); frame:SetFrameLevel(220); frame:SetClampedToScreen(true); frame:EnableMouse(true)
     frame:SetBackdrop({bgFile='Interface\\Buttons\\WHITE8X8',edgeFile='Interface\\Buttons\\WHITE8X8',edgeSize=1})
     frame:SetBackdropColor(0.035,0.03,0.055,0.98); frame:SetBackdropBorderColor(0.42,0.32,0.6,1)
-    Text(frame,T('Luna extra flyouts','Luna Extra-Flyouts'),22,-20,650,'GameFontNormalLarge')
-    local close=Button(frame,'×',28,function() frame:Hide() end); close:SetPoint('TOPRIGHT',-12,-12)
-    frame.choices={}
-    for i=1,COUNT do
-        local choice=Button(frame,'Flyout '..i,145,function()
-            if InCombatLockdown() then return end
-            self:SaveFlyoutEditor(true); frame.index=i; self:RefreshFlyoutEditor()
-        end)
-        choice:SetPoint('TOPLEFT',18,-69-(i-1)*36); frame.choices[i]=choice
+    frame.Title=Text(frame,'',22,-18,305,'GameFontNormalLarge')
+    Text(frame,T('Select or drag a highlighted flyout in Edit Mode.',
+        'Markierten Flyout im Edit Mode anklicken oder ziehen.'),22,-44,336,'GameFontHighlightSmall')
+    local close=Button(frame,'×',24,function() self:ClearFlyoutSelection() end); close:SetPoint('TOPRIGHT',-8,-8)
+    Text(frame,T('Name','Name'),22,-70,180)
+    frame.name=Edit(frame,210,27,-91)
+    Text(frame,T('Icon ID','Symbol-ID'),255,-70,105)
+    frame.icon=Edit(frame,90,260,-91)
+    local function Check(x,text)
+        local check=CreateFrame('CheckButton',nil,frame)
+        check:SetSize(24,24); check:SetPoint('TOPLEFT',x,-126)
+        check:SetNormalTexture('Interface\\Buttons\\UI-CheckBox-Up'); check:SetCheckedTexture('Interface\\Buttons\\UI-CheckBox-Check')
+        check:SetScript('OnClick',function() self:SaveFlyoutEditor() end)
+        Text(frame,text,x+30,-131,145)
+        return check
     end
-    Text(frame,T('Name','Name'),190,-68,180)
-    frame.name=Edit(frame,295,195,-90)
-    Text(frame,T('Icon ID','Symbol-ID'),512,-68,150)
-    frame.icon=Edit(frame,195,517,-90)
-    local enabled=CreateFrame('CheckButton',nil,frame)
-    frame.enabled=enabled; enabled:SetSize(24,24); enabled:SetPoint('TOPLEFT',190,-127)
-    enabled:SetNormalTexture('Interface\\Buttons\\UI-CheckBox-Up'); enabled:SetCheckedTexture('Interface\\Buttons\\UI-CheckBox-Check')
-    Text(frame,T('Enabled','Aktiv'),220,-132,145)
-    local autoclose=CreateFrame('CheckButton',nil,frame)
-    frame.autoclose=autoclose; autoclose:SetSize(24,24); autoclose:SetPoint('TOPLEFT',380,-127)
-    autoclose:SetNormalTexture('Interface\\Buttons\\UI-CheckBox-Up'); autoclose:SetCheckedTexture('Interface\\Buttons\\UI-CheckBox-Check')
-    Text(frame,T('Close after use','Nach Benutzung schließen'),410,-132,290)
-    Text(frame,T('Direction','Richtung'),190,-172,140)
+    frame.enabled=Check(22,T('Enabled','Aktiv'))
+    frame.autoclose=Check(185,T('Close after use','Danach schließen'))
+    Text(frame,T('Opening direction','Öffnungsrichtung'),22,-167,336)
     frame.directions={}
+    local captions={UP=T('Up','Oben'),RIGHT=T('Right','Rechts'),DOWN=T('Down','Unten'),LEFT=T('Left','Links')}
     for i,direction in ipairs({'UP','RIGHT','DOWN','LEFT'}) do
-        local captions={UP=T('Up','Oben'),RIGHT=T('Right','Rechts'),DOWN=T('Down','Unten'),LEFT=T('Left','Links')}
-        local button=Button(frame,captions[direction],100,function()
+        local button=Button(frame,captions[direction],76,function()
             if InCombatLockdown() then return end
             self:SaveFlyoutEditor(true)
             self.flyoutData.bars[frame.index].direction=direction; self:RefreshFlyouts(); self:RefreshFlyoutEditor()
         end)
-        button:SetPoint('TOPLEFT',190+(i-1)*130,-194); frame.directions[direction]=button
+        button:SetPoint('TOPLEFT',22+(i-1)*85,-190); frame.directions[direction]=button
     end
-    Text(frame,T('Scale (0.5–1.5)','Größe (0.5–1.5)'),190,-238,160)
-    frame.scale=Edit(frame,135,195,-260)
-    Text(frame,T('Columns (1–12)','Spalten (1–12)'),365,-238,160)
-    frame.columns=Edit(frame,135,370,-260)
-    Text(frame,T('Shortcut, e.g. CTRL-F','Tastenkürzel, z.B. CTRL-F'),540,-238,195)
-    frame.binding=Edit(frame,168,545,-260)
+    frame.scaleLabel=Text(frame,'',22,-235,336)
+    local slider=CreateFrame('Slider',nil,frame,'BackdropTemplate')
+    frame.scale=slider
+    slider:SetPoint('TOPLEFT',22,-263); slider:SetSize(330,14)
+    slider:SetOrientation('HORIZONTAL'); slider:SetMinMaxValues(0.5,1.5); slider:SetValueStep(0.05); slider:SetObeyStepOnDrag(true)
+    slider:SetBackdrop({bgFile='Interface\\Buttons\\WHITE8X8',edgeFile='Interface\\Buttons\\WHITE8X8',edgeSize=1})
+    slider:SetBackdropColor(0.12,0.1,0.18,1); slider:SetBackdropBorderColor(0.45,0.35,0.6,1)
+    slider:SetThumbTexture('Interface\\Buttons\\UI-SliderBar-Button-Horizontal')
+    slider:SetScript('OnValueChanged',function(_,value)
+        frame.scaleLabel:SetText(T('Size: ','Größe: ') .. string.format('%.0f%%',value*100))
+        if not frame.refreshing then self:SaveFlyoutEditor(true) end
+    end)
+    Text(frame,T('Columns (1–12)','Spalten (1–12)'),22,-299,155)
+    frame.columns=Edit(frame,130,27,-320)
+    Text(frame,T('Shortcut: CTRL-F','Tastenkürzel: CTRL-F'),187,-299,170)
+    frame.binding=Edit(frame,160,192,-320)
+    Text(frame,T('Horizontal position (X)','Horizontale Position (X)'),22,-360,165)
+    frame.x=Edit(frame,145,27,-381)
+    Text(frame,T('Vertical position (Y)','Vertikale Position (Y)'),200,-360,165)
+    frame.y=Edit(frame,145,205,-381)
     frame.slotButtons={}
     for slot=1,SLOTS do
         local button=Button(frame,'',44,function(_,mouseButton)
             if InCombatLockdown() then return end
-            frame.selectedSlot=slot
+            self:SaveFlyoutEditor(true); frame.selectedSlot=slot
             if not self:ReceiveFlyoutAction(frame.index,slot) and mouseButton=='RightButton' then self:SetFlyoutAction(frame.index,slot,nil) end
             self:RefreshFlyoutEditor()
         end)
         button:RegisterForClicks('LeftButtonUp','RightButtonUp'); button:RegisterForDrag('LeftButton')
-        button:SetSize(44,44); button:SetPoint('TOPLEFT',190+((slot-1)%6)*86,-310-math.floor((slot-1)/6)*74)
+        button:SetSize(44,44); button:SetPoint('TOPLEFT',22+((slot-1)%6)*56,-429-math.floor((slot-1)/6)*49)
         button.icon=button:CreateTexture(nil,'ARTWORK'); button.icon:SetAllPoints(); button.icon:SetTexCoord(0.06,0.94,0.06,0.94)
-        button.Caption=Text(frame,tostring(slot),190+((slot-1)%6)*86,-357-math.floor((slot-1)/6)*74,78,'GameFontHighlightSmall')
+        button.Caption=button:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+        button.Caption:SetPoint('TOPLEFT',2,-2); button.Caption:SetText(tostring(slot))
         button:SetScript('OnReceiveDrag',function() frame.selectedSlot=slot; self:ReceiveFlyoutAction(frame.index,slot) end)
         button:SetScript('OnDragStart',function() self:PickupFlyoutAction(frame.index,slot) end)
         button:SetScript('OnEnter',function(selfButton) self:FlyoutActionTooltip(selfButton,self.flyoutData.bars[frame.index].entries[slot]) end)
         button:SetScript('OnLeave',function() GameTooltip:Hide() end)
         frame.slotButtons[slot]=button
     end
-    Text(frame,T('Drop actions onto the slots above. Right click an editor slot to clear it.',
-        'Aktionen auf die Plätze oben ziehen. Rechtsklick auf einen Editor-Platz leert ihn.'),190,-466,530,'GameFontHighlightSmall')
-    frame.action=Edit(frame,350,195,-498)
-    local assign=Button(frame,T('Assign slot','Platz belegen'),160,function()
+    frame.selectedAction=Text(frame,'',22,-535,336,'GameFontHighlightSmall')
+    frame.action=Edit(frame,220,27,-557)
+    local assign=Button(frame,T('Assign','Belegen'),100,function()
         if InCombatLockdown() then return end
         local kind,value=frame.action:GetText():match('^%s*(%a+)%s*:%s*(.-)%s*$')
-        if kind then
-            kind=kind:lower()
-            self:SetFlyoutAction(frame.index,frame.selectedSlot,{type=kind,value=tonumber(value) or value})
-        end
-    end); assign:SetPoint('TOPLEFT',560,-497)
-    Text(frame,T('Optional: spell:123 / item:6948 / macro:Name / equipmentset:Name',
-        'Optional: spell:123 / item:6948 / macro:Name / equipmentset:Name'),190,-530,530,'GameFontHighlightSmall')
-    local save=Button(frame,T('Save settings','Einstellungen speichern'),200,function() self:SaveFlyoutEditor() end)
-    save:SetPoint('BOTTOMRIGHT',-24,22)
-    local editMode=Button(frame,T('Move in Edit Mode','Im Edit Mode verschieben'),260,function()
+        if kind then self:SetFlyoutAction(frame.index,frame.selectedSlot,{type=kind:lower(),value=tonumber(value) or value}) end
+    end); assign:SetPoint('TOPLEFT',255,-556)
+    Text(frame,T('Drop actions onto a slot. Right click clears it. Optional: spell:123 / item:6948 / macro:Name',
+        'Aktionen auf Plätze ziehen. Rechtsklick leert sie. Optional: spell:123 / item:6948 / macro:Name'),22,-596,336,'GameFontHighlightSmall'):SetWordWrap(true)
+    local reset=Button(frame,T('Reset position','Position zurücksetzen'),210,function()
         if InCombatLockdown() then return end
-        self:SaveFlyoutEditor(); frame:Hide(); self:OpenLunaEditMode()
-    end); editMode:SetPoint('BOTTOMLEFT',190,22)
-    Text(frame,T('Twelve slots per flyout. Changes are saved per character.',
-        'Zwölf Plätze pro Flyout. Änderungen gelten für diesen Charakter.'),20,-455,145,'GameFontHighlightSmall'):SetWordWrap(true)
-    frame:SetScript('OnShow',function() self:RefreshFlyoutEditor() end)
+        self:SaveFlyoutEditor(true)
+        local bar=self.flyoutData.bars[frame.index]
+        bar.point,bar.relativePoint='BOTTOM','BOTTOM'; bar.x=-320+(frame.index-1)*80; bar.y=230
+        self:RefreshFlyouts(); self:RefreshFlyoutEditor()
+    end); reset:SetPoint('TOPLEFT',22,-641)
+    Text(frame,T('Saved automatically for this character.','Wird für diesen Charakter automatisch gespeichert.'),22,-677,336,'GameFontHighlightSmall')
     frame:SetScript('OnHide',function()
-        for _,field in ipairs({frame.name,frame.icon,frame.scale,frame.columns,frame.binding,frame.action}) do field:ClearFocus() end
+        for _,field in ipairs({frame.name,frame.icon,frame.columns,frame.binding,frame.x,frame.y,frame.action}) do field:ClearFocus() end
+        if self.selectedFlyout==frame.index then self.selectedFlyout=nil; self:RefreshFlyoutMovers() end
     end)
-    for _,field in ipairs({frame.name,frame.icon,frame.scale,frame.columns,frame.binding}) do
-        field:SetScript('OnEditFocusLost',function() self:SaveFlyoutEditor(true) end)
+    for _,field in ipairs({frame.name,frame.icon,frame.columns,frame.binding,frame.x,frame.y}) do
+        field:SetScript('OnEditFocusLost',function() if not frame.refreshing then self:SaveFlyoutEditor(true) end end)
         field:SetScript('OnEnterPressed',function(box) self:SaveFlyoutEditor(); box:ClearFocus() end)
     end
-    UISpecialFrames[#UISpecialFrames+1]='DragonflightUIForeverFlyoutEditor'
-    self:RefreshFlyoutEditor()
+    frame:Hide()
+    UISpecialFrames[#UISpecialFrames+1]='DragonflightUIForeverFlyoutSettings'
+    return frame
 end
 
 function DF:RefreshFlyoutEditor()
     local frame=self.flyoutEditor
     if not frame or not self.flyoutData then return end
     local bar=self.flyoutData.bars[frame.index]
+    frame.refreshing=true
+    frame.Title:SetText(T('Flyout ','Flyout ') .. frame.index .. ' · ' .. bar.name)
     frame.name:SetText(bar.name); frame.icon:SetText(tostring(bar.icon))
-    frame.scale:SetText(tostring(bar.scale)); frame.columns:SetText(tostring(bar.columns)); frame.binding:SetText(bar.binding)
+    frame.scale:SetValue(bar.scale); frame.columns:SetText(tostring(bar.columns)); frame.binding:SetText(bar.binding)
+    frame.x:SetText(tostring(bar.x)); frame.y:SetText(tostring(bar.y))
     frame.enabled:SetChecked(bar.enabled); frame.autoclose:SetChecked(bar.closeAfterClick)
-    for i,choice in ipairs(frame.choices) do choice.Label:SetText(i .. ' · ' .. self.flyoutData.bars[i].name) end
     for direction,button in pairs(frame.directions) do
         button:SetBackdropBorderColor(direction==bar.direction and 1 or 0.4,0.5,0.8,1)
     end
     self:RefreshFlyoutEditorSlots()
     local action=bar.entries[frame.selectedSlot]
     frame.action:SetText(action and (action.type .. ':' .. action.value) or '')
+    frame.refreshing=false
 end
 
 function DF:RefreshFlyoutEditorSlots()
@@ -622,22 +666,25 @@ function DF:RefreshFlyoutEditorSlots()
     if not frame or not self.flyoutData then return end
     local bar=self.flyoutData.bars[frame.index]
     for slot,button in ipairs(frame.slotButtons) do
-        local action=bar.entries[slot]
-        local name,icon=self:GetFlyoutActionInfo(action)
-        button.icon:SetTexture(icon); button.Caption:SetText(name~='' and name or tostring(slot))
+        local _,icon=self:GetFlyoutActionInfo(bar.entries[slot])
+        button.icon:SetTexture(icon)
         button:SetBackdropBorderColor(slot==frame.selectedSlot and 1 or 0.35,0.5,0.8,1)
     end
+    local name=self:GetFlyoutActionInfo(bar.entries[frame.selectedSlot])
+    frame.selectedAction:SetText(T('Slot ','Platz ') .. frame.selectedSlot .. ' · ' .. name)
 end
 
 function DF:SaveFlyoutEditor(skipRefresh)
-    if InCombatLockdown() then self:Print(T('Save outside combat.','Außerhalb des Kampfes speichern.')); return end
     local frame=self.flyoutEditor
-    if not frame then return end
+    if InCombatLockdown() or not self.editModeSession or not frame or frame.refreshing or not self.flyoutData then return end
     local bar=self.flyoutData.bars[frame.index]
     bar.name=frame.name:GetText():sub(1,40)
+    if bar.name=='' then bar.name='Flyout ' .. frame.index end
     bar.icon=Number(tonumber(frame.icon:GetText()),1,2147483647,QUESTION)
-    bar.scale=Number(tonumber(frame.scale:GetText()),0.5,1.5,0.8)
+    bar.scale=math.floor(Number(frame.scale:GetValue(),0.5,1.5,0.8)*100+0.5)/100
     bar.columns=math.floor(Number(tonumber(frame.columns:GetText()),1,SLOTS,1))
+    bar.x=Number(tonumber(frame.x:GetText()),-4000,4000,bar.x)
+    bar.y=Number(tonumber(frame.y:GetText()),-4000,4000,bar.y)
     bar.binding=frame.binding:GetText():upper():gsub('%s+',''):sub(1,40)
     if not bar.binding:match('^[A-Z0-9%-]*$') then bar.binding='' end
     bar.enabled=frame.enabled:GetChecked()==true; bar.closeAfterClick=frame.autoclose:GetChecked()==true

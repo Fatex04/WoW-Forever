@@ -5,9 +5,19 @@ local function T(en, de) return german and de or en end
 
 DF.discordURL = 'https://discord.gg/ZfYDHV6Qgs'
 DF.releaseNotes = {
+    T('Clearer artwork and bottom action bars', 'Klarere Darstellung und untere Aktionsleisten'),
+    T('Luna artwork uses smoother texture sampling. Small buttons now keep their native size, and unit-frame text uses whole screen pixels with one outline.',
+      'Luna-Grafiken werden gleichmäßiger gezeichnet. Kleine Knöpfe behalten ihre native Größe, und Einheitentexte nutzen ganze Bildschirmpixel mit einfacher Kontur.'),
+    T('The untouched Luna preset has more space below its bottom action bars. Custom positions and other layouts are retained.',
+      'Die unveränderte Luna-Vorlage hat mehr Abstand unter den unteren Aktionsleisten. Eigene Positionen und andere Layouts bleiben erhalten.'),
+    T('Customize flyouts directly in Edit Mode', 'Flyouts direkt im Edit Mode anpassen'),
+    T('Open Esc > Edit Mode and click a highlighted flyout. Its settings appear beside the HUD editor: size, direction, position, shortcut and action slots. Drag the highlight to move it.',
+      'Esc > Edit Mode öffnen und einen markierten Flyout anklicken. Daneben erscheinen Größe, Richtung, Position, Tastenkürzel und Belegung. Die Markierung zum Verschieben ziehen.'),
+    T('Disabled flyouts are also shown in Edit Mode so you can select and enable them. There is no separate flyout menu; /df flyouts opens the same Edit Mode selection.',
+      'Deaktivierte Flyouts erscheinen im Edit Mode zum Auswählen und Aktivieren. Es gibt kein separates Flyout-Menü mehr; /df flyouts öffnet dieselbe Auswahl im Edit Mode.'),
     T('Flyout startup hotfix', 'Hotfix für den Flyout-Start'),
-    T('Fixed the missing secure helper on flyout popups. All ten launchers and their slots now finish initializing with the Forever client templates.',
-      'Fehlende Secure-Hilfsmethode am Flyout-Popup behoben. Alle zehn Knöpfe und ihre Plätze werden mit den Forever-Clientvorlagen vollständig aufgebaut.'),
+    T('Fixed flyouts failing to start and producing repeated popup or mover errors in BugSack.',
+      'Behoben: Flyouts starteten nicht und erzeugten wiederholt Popup- oder Verschieberahmen-Fehler in BugSack.'),
     T('Incomplete flyouts stay hidden. Cooldown updates and opening or closing Edit Mode no longer cause follow-up popup or mover errors after an interrupted startup.',
       'Unvollständige Flyouts bleiben ausgeblendet. Cooldown-Updates sowie das Öffnen und Schließen des Edit Mode verursachen nach einem abgebrochenen Start keine Folgefehler bei Popup oder Verschieberahmen mehr.'),
     T('Your saved flyout actions, shortcuts, positions and layouts are retained.',

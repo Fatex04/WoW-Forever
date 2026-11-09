@@ -80,11 +80,11 @@ local pages = {
         {'tooltipScale', T('Tooltip scale', 'Tooltip-Skalierung'), 0.75, 1.5, 0.05},
     }},
     {title = T('Extra flyouts','Extra-Flyouts'), description = T(
-        'Ten Classic-style extra buttons with twelve configurable slots each. Drag spells, items, mounts, toys, macros or equipment sets into the flyout editor. Move the launchers in Luna Edit Mode.',
-        'Zehn zusätzliche Knöpfe wie in Classic mit je zwölf konfigurierbaren Plätzen. Zauber, Gegenstände, Reittiere, Spielzeuge, Makros oder Ausrüstungssets in den Editor ziehen. Im Luna Edit Mode verschieben.'), controls = {
+        'Open Edit Mode and click a highlighted flyout directly to customize it. Drag a highlight to move it. Disabled flyouts also appear there so they can be enabled.',
+        'Edit Mode öffnen und einen markierten Flyout direkt anklicken, um ihn anzupassen. Markierung zum Verschieben ziehen. Deaktivierte Flyouts werden dort ebenfalls zum Aktivieren angezeigt.'), controls = {
         {'flyouts', T('Enable extra flyouts','Zusätzliche Flyouts aktivieren')},
     }, actions = {
-        {T('Configure flyouts','Flyouts konfigurieren'),function() DF:ToggleFlyoutEditor(1) end},
+        {T('Open Edit Mode','Edit Mode öffnen'),function() DF:OpenLunaEditMode() end},
     }},
 }
 
@@ -381,8 +381,9 @@ function DF:CreateLunaEditMode()
     close:SetPoint('TOPRIGHT', -8, -8)
     local appearance = Button(frame, T('Luna settings', 'Luna-Einstellungen'), 180, function() DF:ShowSelectedAppearance() end)
     appearance:SetPoint('TOPRIGHT', -25, -69)
-    local flyouts = Button(frame, T('Extra flyouts','Extra-Flyouts'), 200, function() DF:ToggleFlyoutEditor(1) end)
-    flyouts:SetPoint('BOTTOMLEFT',25,54)
+    local hint=Text(frame,T('Click a highlighted element to customize it.',
+        'Markiertes Element zum Anpassen anklicken.'),25,-245,215,'GameFontHighlightSmall')
+    hint:ClearAllPoints(); hint:SetPoint('BOTTOMLEFT',25,54); hint:SetWordWrap(true)
     local updates = Button(frame, T('Patchnotes & Discord','Patchnotes & Discord'), 225, function() DF:ShowUpdateNotice(true) end)
     updates:SetPoint('BOTTOMRIGHT',-25,54)
     frame:SetScript('OnHide', function()
@@ -461,6 +462,7 @@ end
 function DF:EndLunaEditMode()
     local session = self.editModeSession
     if not session or self.restoringEditMode then return end
+    self:ClearFlyoutSelection()
     self.restoringEditMode = true
     for control, saved in pairs(session.controls) do RestoreControl(control, saved) end
     for region, saved in pairs(session.chrome) do
@@ -488,6 +490,7 @@ function DF:RefreshLunaEditMode()
 end
 
 function DF:ShowSelectedAppearance()
+    if self.selectedFlyout then self:SelectFlyoutInEditMode(self.selectedFlyout); return end
     local frame = self.editSelectedSystem
     local name = frame and frame.GetName and frame:GetName() or ''
     local pageIndex = 1
@@ -527,7 +530,16 @@ function DF:InstallLunaEditMode()
     end
     hooksecurefunc(manager, 'Layout', function() self:LayoutLunaEditMode() end)
     if manager.SelectSystem then
-        hooksecurefunc(manager, 'SelectSystem', function(_, systemFrame) self.editSelectedSystem = systemFrame end)
+        hooksecurefunc(manager, 'SelectSystem', function(_, systemFrame)
+            self:ClearFlyoutSelection()
+            self.editSelectedSystem = systemFrame
+        end)
+    end
+    if manager.ClearSelectedSystem then
+        hooksecurefunc(manager,'ClearSelectedSystem',function()
+            self:ClearFlyoutSelection()
+            self.editSelectedSystem=nil
+        end)
     end
     self:RefreshLunaEditMode()
 end
